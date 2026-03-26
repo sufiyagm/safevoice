@@ -1,0 +1,5081 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SafeVoice</title>
+  <style>
+    /* ── CSS Custom Properties ── */
+    :root {
+      --color-primary: #C8B6E2;   /* lavender */
+      --color-secondary: #7EC8C8; /* teal */
+      --color-bg: #F9F6FF;
+      --color-surface: #FFFFFF;
+      --color-text: #2D2D2D;
+      --color-danger: #E57373;
+      --color-success: #81C784;
+      --radius: 16px;
+      --shadow: 0 4px 16px rgba(0,0,0,0.08);
+    }
+
+    [data-theme="dark"] {
+      --color-bg: #1A1A2E;
+      --color-surface: #16213E;
+      --color-text: #E8E8F0;
+    }
+
+    /* ── Reset & Base ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 16px;
+      background: var(--color-bg);
+      color: var(--color-text);
+      min-height: 100vh;
+      max-width: 430px;
+      margin: 0 auto;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    /* ── Screen Visibility ── */
+    [data-screen] {
+      display: none;
+      min-height: 100vh;
+      padding: 16px;
+      padding-bottom: 80px; /* space for nav bar */
+    }
+
+    [data-screen].active {
+      display: block;
+    }
+
+    /* ── Shared Component Placeholders ── */
+    #navbar {
+      position: fixed;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 100%;
+      max-width: 430px;
+      background: var(--color-surface);
+      box-shadow: 0 -2px 8px rgba(0,0,0,0.08);
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      height: 60px;
+      z-index: 100;
+    }
+
+    #navbar button {
+      background: none;
+      border: none;
+      font-size: 18px;
+      cursor: pointer;
+      padding: 4px 8px;
+      min-width: 48px;
+      min-height: 48px;
+      color: var(--color-text);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      flex: 1;
+      opacity: 0.6;
+      transition: opacity 0.2s;
+    }
+
+    #navbar button.active-tab {
+      opacity: 1;
+      color: var(--color-primary);
+    }
+
+    #navbar button span.tab-label {
+      font-size: 10px;
+      line-height: 1;
+    }
+
+    #sos-button {
+      position: fixed;
+      bottom: 80px;
+      right: 16px;
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background: var(--color-danger);
+      color: #fff;
+      font-weight: bold;
+      font-size: 14px;
+      border: none;
+      cursor: pointer;
+      box-shadow: var(--shadow);
+      z-index: 200;
+      min-width: 48px;
+      min-height: 48px;
+    }
+
+    #quickexit-button {
+      position: fixed;
+      top: 12px;
+      right: 12px;
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: var(--color-danger);
+      color: #fff;
+      font-size: 18px;
+      border: none;
+      cursor: pointer;
+      z-index: 300;
+    }
+
+    #toast {
+      position: fixed;
+      top: -60px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--color-text);
+      color: var(--color-bg);
+      padding: 12px 24px;
+      border-radius: var(--radius);
+      font-size: 14px;
+      z-index: 500;
+      transition: top 0.3s ease;
+      white-space: nowrap;
+    }
+
+    #toast.show { top: 16px; }
+
+    #modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 400;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #modal-overlay.show { display: flex; }
+
+    #modal-box {
+      background: var(--color-surface);
+      border-radius: var(--radius);
+      padding: 24px;
+      max-width: 320px;
+      width: 90%;
+      box-shadow: var(--shadow);
+    }
+
+    /* ── Quick Exit Screen ── */
+    #quickexit-screen {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: #f0f0f0;
+      z-index: 1000;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #quickexit-screen.show { display: flex; }
+
+    /* ── Report Form ── */
+    .report-screen {
+      padding-top: 16px;
+    }
+
+    .report-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .report-back-btn {
+      background: none;
+      border: none;
+      font-size: 22px;
+      color: var(--color-secondary);
+      cursor: pointer;
+      min-width: 48px;
+      min-height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      transition: background 0.2s;
+    }
+
+    .report-back-btn:hover {
+      background: rgba(126,200,200,0.15);
+    }
+
+    .report-title {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--color-text);
+    }
+
+    .report-form {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .report-field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .report-label {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--color-text);
+    }
+
+    .report-label .report-required {
+      color: var(--color-danger);
+      margin-left: 2px;
+    }
+
+    .report-select,
+    .report-textarea,
+    .report-input {
+      border: 2px solid #e0d8f0;
+      border-radius: 12px;
+      padding: 12px 14px;
+      font-size: 16px;
+      background: var(--color-bg);
+      color: var(--color-text);
+      outline: none;
+      transition: border-color 0.2s;
+      min-height: 48px;
+      width: 100%;
+      font-family: inherit;
+    }
+
+    .report-select:focus,
+    .report-textarea:focus,
+    .report-input:focus {
+      border-color: var(--color-primary);
+    }
+
+    .report-textarea {
+      min-height: 100px;
+      resize: vertical;
+    }
+
+    .report-desc-row {
+      display: flex;
+      gap: 8px;
+      align-items: flex-start;
+    }
+
+    .report-desc-row .report-textarea {
+      flex: 1;
+    }
+
+    .report-mic-btn {
+      background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+      border: none;
+      border-radius: 12px;
+      width: 48px;
+      min-width: 48px;
+      min-height: 48px;
+      font-size: 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: opacity 0.2s, transform 0.15s;
+      flex-shrink: 0;
+      margin-top: 0;
+    }
+
+    .report-mic-btn:active {
+      transform: scale(0.95);
+    }
+
+    .report-mic-btn.listening {
+      animation: mic-pulse 1s ease-in-out infinite;
+    }
+
+    @keyframes mic-pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .report-location-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .report-location-row .report-input {
+      flex: 1;
+    }
+
+    .report-gps-btn {
+      background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+      border: none;
+      border-radius: 12px;
+      width: 48px;
+      min-width: 48px;
+      min-height: 48px;
+      font-size: 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: opacity 0.2s, transform 0.15s;
+      flex-shrink: 0;
+    }
+
+    .report-gps-btn:active {
+      transform: scale(0.95);
+    }
+
+    .report-file-label {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border: 2px dashed #c8b6e2;
+      border-radius: 12px;
+      padding: 14px;
+      cursor: pointer;
+      background: var(--color-bg);
+      transition: border-color 0.2s, background 0.2s;
+      min-height: 52px;
+    }
+
+    .report-file-label:hover {
+      border-color: var(--color-primary);
+      background: rgba(200,182,226,0.08);
+    }
+
+    .report-file-label span {
+      font-size: 15px;
+      color: #888;
+    }
+
+    .report-file-names {
+      font-size: 13px;
+      color: var(--color-secondary);
+      margin-top: 4px;
+      word-break: break-all;
+    }
+
+    .report-error {
+      font-size: 13px;
+      color: var(--color-danger);
+      margin: 0;
+      display: none;
+    }
+
+    .report-error.visible {
+      display: block;
+    }
+
+    .report-submit-btn {
+      background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+      color: #fff;
+      border: none;
+      border-radius: 28px;
+      padding: 16px;
+      font-size: 17px;
+      font-weight: 700;
+      min-height: 56px;
+      cursor: pointer;
+      box-shadow: 0 4px 16px rgba(200,182,226,0.45);
+      transition: transform 0.15s, box-shadow 0.15s;
+      margin-top: 4px;
+      letter-spacing: 0.3px;
+    }
+
+    .report-submit-btn:active {
+      transform: scale(0.97);
+      box-shadow: 0 2px 8px rgba(200,182,226,0.4);
+    }
+
+    .report-submit-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    /* ── Report Confirm ── */
+    .confirm-screen {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 80vh;
+      text-align: center;
+      gap: 20px;
+      padding: 24px 16px;
+    }
+
+    .confirm-icon {
+      font-size: 72px;
+      line-height: 1;
+      filter: drop-shadow(0 4px 12px rgba(0,0,0,0.1));
+    }
+
+    .confirm-card {
+      background: var(--color-surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 28px 24px;
+      width: 100%;
+      max-width: 340px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .confirm-title {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--color-text);
+    }
+
+    .confirm-subtitle {
+      font-size: 14px;
+      color: #888;
+      line-height: 1.5;
+    }
+
+    .confirm-id-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .confirm-id-value {
+      font-size: 26px;
+      font-weight: 800;
+      color: var(--color-primary);
+      letter-spacing: 2px;
+      font-variant-numeric: tabular-nums;
+      background: rgba(200,182,226,0.15);
+      border-radius: 10px;
+      padding: 8px 20px;
+    }
+
+    .confirm-hint {
+      font-size: 13px;
+      color: #aaa;
+      line-height: 1.5;
+    }
+
+    .confirm-done-btn {
+      background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+      color: #fff;
+      border: none;
+      border-radius: 28px;
+      padding: 14px 40px;
+      font-size: 16px;
+      font-weight: 600;
+      min-height: 52px;
+      cursor: pointer;
+      box-shadow: 0 4px 14px rgba(200,182,226,0.45);
+      transition: transform 0.15s;
+      margin-top: 4px;
+    }
+
+    .confirm-done-btn:active {
+      transform: scale(0.97);
+    }
+
+    /* ── Utility ── */
+    .card {
+      background: var(--color-surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+
+    button, [role="button"] {
+      min-width: 48px;
+      min-height: 48px;
+      cursor: pointer;
+    }
+
+    /* ── Onboarding Screen ── */
+    [data-screen="onboarding"] {
+      padding: 0;
+      padding-bottom: 0;
+      background: linear-gradient(145deg, #e8dff5 0%, #d0f0f0 100%);
+      display: none;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    [data-screen="onboarding"].active {
+      display: flex;
+    }
+
+    .onboarding-header {
+      display: flex;
+      justify-content: flex-end;
+      padding: 16px 20px 0;
+    }
+
+    .onboarding-skip-btn {
+      background: none;
+      border: none;
+      color: #7a6a9a;
+      font-size: 15px;
+      min-width: 48px;
+      min-height: 48px;
+      cursor: pointer;
+      padding: 8px 12px;
+      border-radius: 24px;
+      transition: background 0.2s;
+    }
+
+    .onboarding-skip-btn:hover {
+      background: rgba(200,182,226,0.3);
+    }
+
+    .onboarding-slides-wrapper {
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .onboarding-slides-track {
+      display: flex;
+      height: 100%;
+      transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+      will-change: transform;
+    }
+
+    .onboarding-slide {
+      min-width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 32px 28px;
+      text-align: center;
+      gap: 20px;
+    }
+
+    .onboarding-slide-icon {
+      font-size: 72px;
+      line-height: 1;
+      filter: drop-shadow(0 4px 12px rgba(0,0,0,0.12));
+    }
+
+    .onboarding-slide-card {
+      background: rgba(255,255,255,0.75);
+      backdrop-filter: blur(8px);
+      border-radius: 24px;
+      padding: 28px 24px;
+      box-shadow: 0 8px 32px rgba(140,100,200,0.12);
+      max-width: 340px;
+      width: 100%;
+    }
+
+    .onboarding-slide-title {
+      font-size: 22px;
+      font-weight: 700;
+      color: #4a3570;
+      margin-bottom: 12px;
+      line-height: 1.3;
+    }
+
+    .onboarding-slide-desc {
+      font-size: 15px;
+      color: #5a5070;
+      line-height: 1.6;
+    }
+
+    .onboarding-slide-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      margin-top: 14px;
+    }
+
+    .onboarding-tag {
+      background: rgba(200,182,226,0.4);
+      color: #4a3570;
+      border-radius: 20px;
+      padding: 4px 14px;
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .onboarding-footer {
+      padding: 20px 24px 32px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .onboarding-dots {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .onboarding-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: rgba(122,106,154,0.3);
+      transition: all 0.3s ease;
+    }
+
+    .onboarding-dot.active {
+      width: 24px;
+      border-radius: 4px;
+      background: var(--color-primary);
+    }
+
+    .onboarding-next-btn {
+      background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+      color: #fff;
+      border: none;
+      border-radius: 28px;
+      padding: 14px 48px;
+      font-size: 16px;
+      font-weight: 600;
+      min-height: 52px;
+      box-shadow: 0 4px 16px rgba(200,182,226,0.5);
+      transition: transform 0.15s, box-shadow 0.15s;
+      letter-spacing: 0.3px;
+    }
+
+    .onboarding-next-btn:active {
+      transform: scale(0.97);
+      box-shadow: 0 2px 8px rgba(200,182,226,0.4);
+    }
+
+    /* ── Auth Screen ── */
+    [data-screen="auth"] {
+      background: linear-gradient(160deg, #ede8f8 0%, #d8f2f2 100%);
+      padding-bottom: 32px;
+    }
+
+    .auth-container {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      padding-top: 24px;
+    }
+
+    .auth-header {
+      text-align: center;
+      padding: 8px 0 4px;
+    }
+
+    .auth-logo {
+      font-size: 56px;
+      line-height: 1;
+      filter: drop-shadow(0 4px 10px rgba(0,0,0,0.1));
+    }
+
+    .auth-title {
+      font-size: 28px;
+      font-weight: 700;
+      color: #4a3570;
+      margin-top: 8px;
+    }
+
+    .auth-subtitle {
+      font-size: 15px;
+      color: #6a5a8a;
+      margin-top: 4px;
+    }
+
+    .auth-methods {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .auth-card {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      background: var(--color-surface);
+      border: none;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 16px 18px;
+      cursor: pointer;
+      text-align: left;
+      transition: transform 0.15s, box-shadow 0.15s;
+      min-height: 72px;
+      width: 100%;
+    }
+
+    .auth-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    }
+
+    .auth-card:active {
+      transform: scale(0.98);
+    }
+
+    .auth-card-icon {
+      font-size: 28px;
+      flex-shrink: 0;
+    }
+
+    .auth-card-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .auth-card-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--color-text);
+    }
+
+    .auth-card-desc {
+      font-size: 13px;
+      color: #888;
+      line-height: 1.4;
+    }
+
+    .auth-card-arrow {
+      font-size: 22px;
+      color: var(--color-primary);
+      flex-shrink: 0;
+    }
+
+    .auth-form {
+      background: var(--color-surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .auth-back-btn {
+      background: none;
+      border: none;
+      color: var(--color-secondary);
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      padding: 4px 0;
+      min-height: 36px;
+      text-align: left;
+      align-self: flex-start;
+    }
+
+    .auth-form-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: #4a3570;
+    }
+
+    .auth-label {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--color-text);
+    }
+
+    .auth-input {
+      border: 2px solid #e0d8f0;
+      border-radius: 12px;
+      padding: 12px 14px;
+      font-size: 16px;
+      background: var(--color-bg);
+      color: var(--color-text);
+      outline: none;
+      transition: border-color 0.2s;
+      min-height: 48px;
+      width: 100%;
+    }
+
+    .auth-input:focus {
+      border-color: var(--color-primary);
+    }
+
+    .auth-input:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .auth-otp-input {
+      letter-spacing: 0.3em;
+      font-size: 22px;
+      text-align: center;
+    }
+
+    .auth-error {
+      font-size: 13px;
+      color: var(--color-danger);
+      margin: 0;
+    }
+
+    .auth-submit-btn {
+      background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+      color: #fff;
+      border: none;
+      border-radius: 28px;
+      padding: 14px;
+      font-size: 16px;
+      font-weight: 600;
+      min-height: 52px;
+      cursor: pointer;
+      box-shadow: 0 4px 14px rgba(200,182,226,0.45);
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+
+    .auth-submit-btn:active {
+      transform: scale(0.97);
+    }
+
+    .auth-submit-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .auth-otp-hint {
+      font-size: 14px;
+      color: #666;
+      line-height: 1.5;
+    }
+
+    .auth-otp-timer-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 4px 0;
+    }
+
+    .auth-otp-timer-label {
+      font-size: 13px;
+      color: #888;
+    }
+
+    .auth-otp-countdown {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--color-secondary);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .auth-otp-countdown.expired {
+      color: var(--color-danger);
+    }
+
+    .auth-resend-btn {
+      background: none;
+      border: 2px solid var(--color-primary);
+      border-radius: 28px;
+      padding: 12px;
+      font-size: 15px;
+      font-weight: 600;
+      color: #4a3570;
+      cursor: pointer;
+      min-height: 48px;
+      transition: background 0.2s;
+    }
+
+    .auth-resend-btn:hover {
+      background: rgba(200,182,226,0.15);
+    }
+
+    /* ── Dashboard Screen ── */
+    [data-screen="dashboard"] {
+      padding: 0;
+      padding-bottom: 80px;
+      background: var(--color-bg);
+      display: none;
+      flex-direction: column;
+    }
+
+    [data-screen="dashboard"].active {
+      display: flex;
+    }
+
+    .dashboard-header {
+      background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary) 100%);
+      padding: 20px 16px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      position: relative;
+    }
+
+    .dashboard-header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .dashboard-app-name {
+      font-size: 24px;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: 0.3px;
+    }
+
+    .dashboard-header-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .dashboard-theme-btn {
+      background: rgba(255,255,255,0.25);
+      border: none;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      min-width: 48px;
+      min-height: 48px;
+      font-size: 18px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s;
+      color: #fff;
+      padding: 0;
+      width: 48px;
+      height: 48px;
+    }
+
+    .dashboard-theme-btn:hover {
+      background: rgba(255,255,255,0.35);
+    }
+
+    .dashboard-tagline {
+      font-size: 14px;
+      color: rgba(255,255,255,0.88);
+      font-style: italic;
+      margin-top: 2px;
+    }
+
+    .dashboard-body {
+      flex: 1;
+      padding: 20px 16px 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .dashboard-card {
+      background: var(--color-surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 20px 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      min-height: 100px;
+      border: none;
+      cursor: pointer;
+      text-align: center;
+      transition: transform 0.15s, box-shadow 0.15s;
+      position: relative;
+      overflow: hidden;
+      min-width: 48px;
+    }
+
+    .dashboard-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(200,182,226,0.18) 0%, rgba(126,200,200,0.18) 100%);
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .dashboard-card:hover::before {
+      opacity: 1;
+    }
+
+    .dashboard-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    }
+
+    .dashboard-card:active {
+      transform: scale(0.97);
+      box-shadow: var(--shadow);
+    }
+
+    .dashboard-card-icon {
+      font-size: 32px;
+      line-height: 1;
+    }
+
+    .dashboard-card-label {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--color-text);
+      line-height: 1.3;
+    }
+
+    .dashboard-card-wide {
+      grid-column: 1 / -1;
+      flex-direction: row;
+      justify-content: flex-start;
+      padding: 18px 20px;
+      gap: 14px;
+      min-height: 64px;
+      background: linear-gradient(135deg, rgba(200,182,226,0.25) 0%, rgba(126,200,200,0.25) 100%);
+    }
+
+    .dashboard-card-wide .dashboard-card-label {
+      font-size: 16px;
+    }
+
+    .dashboard-card-sos {
+      background: linear-gradient(135deg, #E57373 0%, #ef9a9a 100%);
+      color: #fff;
+    }
+
+    .dashboard-card-sos .dashboard-card-label {
+      color: #fff;
+    }
+
+    .dashboard-card-sos::before {
+      background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.05) 100%);
+    }
+
+    /* ── SOS Screen ── */
+    [data-screen="sos"] {
+      background: linear-gradient(160deg, #b71c1c 0%, #e53935 60%, #ef9a9a 100%);
+      padding: 0;
+      padding-bottom: 0;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      min-height: 100vh;
+    }
+
+    [data-screen="sos"].active {
+      display: flex;
+    }
+
+    .sos-screen-inner {
+      width: 100%;
+      max-width: 430px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 48px 20px 40px;
+      gap: 24px;
+      min-height: 100vh;
+    }
+
+    .sos-pulse-ring {
+      position: relative;
+      width: 120px;
+      height: 120px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .sos-pulse-ring::before,
+    .sos-pulse-ring::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.25);
+      animation: sos-ripple 2s ease-out infinite;
+    }
+
+    .sos-pulse-ring::after {
+      animation-delay: 1s;
+    }
+
+    @keyframes sos-ripple {
+      0%   { transform: scale(1);   opacity: 0.7; }
+      100% { transform: scale(1.9); opacity: 0; }
+    }
+
+    .sos-icon-circle {
+      width: 96px;
+      height: 96px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.2);
+      border: 3px solid rgba(255, 255, 255, 0.6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 44px;
+      animation: sos-pulse-icon 1.5s ease-in-out infinite;
+      position: relative;
+      z-index: 1;
+    }
+
+    @keyframes sos-pulse-icon {
+      0%, 100% { transform: scale(1);    box-shadow: 0 0 0 0 rgba(255,255,255,0.4); }
+      50%       { transform: scale(1.06); box-shadow: 0 0 0 12px rgba(255,255,255,0); }
+    }
+
+    .sos-heading {
+      font-size: 32px;
+      font-weight: 800;
+      color: #fff;
+      letter-spacing: 1px;
+      text-align: center;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      animation: sos-blink 2s ease-in-out infinite;
+    }
+
+    @keyframes sos-blink {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.75; }
+    }
+
+    .sos-status-text {
+      font-size: 15px;
+      color: rgba(255,255,255,0.88);
+      text-align: center;
+      line-height: 1.5;
+    }
+
+    .sos-contacts-card {
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.3);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      width: 100%;
+      backdrop-filter: blur(6px);
+    }
+
+    .sos-contacts-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: rgba(255,255,255,0.75);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 10px;
+    }
+
+    .sos-contact-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.12);
+    }
+
+    .sos-contact-item:last-child {
+      border-bottom: none;
+    }
+
+    .sos-contact-icon {
+      font-size: 18px;
+    }
+
+    .sos-contact-name {
+      font-size: 15px;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    .sos-contact-phone {
+      font-size: 13px;
+      color: rgba(255,255,255,0.7);
+      margin-left: auto;
+    }
+
+    .sos-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      width: 100%;
+      margin-top: auto;
+      padding-top: 8px;
+    }
+
+    .sos-helpline-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      background: #fff;
+      color: #b71c1c;
+      border: none;
+      border-radius: 28px;
+      padding: 16px;
+      font-size: 17px;
+      font-weight: 700;
+      min-height: 56px;
+      width: 100%;
+      cursor: pointer;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+      text-decoration: none;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+
+    .sos-helpline-btn:active {
+      transform: scale(0.97);
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    }
+
+    .sos-cancel-btn {
+      background: rgba(255,255,255,0.18);
+      color: #fff;
+      border: 2px solid rgba(255,255,255,0.5);
+      border-radius: 28px;
+      padding: 14px;
+      font-size: 16px;
+      font-weight: 600;
+      min-height: 52px;
+      width: 100%;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.15s;
+    }
+
+    .sos-cancel-btn:active {
+      transform: scale(0.97);
+      background: rgba(255,255,255,0.28);
+    }
+
+    /* ── Help Map Screen ── */
+    [data-screen="map"] {
+      padding: 0;
+      padding-bottom: 80px;
+      display: none;
+      flex-direction: column;
+    }
+
+    [data-screen="map"].active {
+      display: flex;
+    }
+
+    .map-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 16px 16px 12px;
+      background: var(--color-surface);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .map-back-btn {
+      background: none;
+      border: none;
+      font-size: 22px;
+      color: var(--color-secondary);
+      cursor: pointer;
+      min-width: 48px;
+      min-height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      transition: background 0.2s;
+      flex-shrink: 0;
+    }
+
+    .map-back-btn:hover {
+      background: rgba(126,200,200,0.15);
+    }
+
+    .map-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--color-text);
+      flex: 1;
+    }
+
+    .map-heatmap-btn {
+      background: var(--color-bg);
+      border: 2px solid var(--color-primary);
+      border-radius: 20px;
+      padding: 6px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--color-text);
+      cursor: pointer;
+      min-height: 36px;
+      transition: background 0.2s, color 0.2s;
+      white-space: nowrap;
+    }
+
+    .map-heatmap-btn.active {
+      background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+      color: #fff;
+      border-color: transparent;
+    }
+
+    .map-container {
+      position: relative;
+      width: 100%;
+      height: 240px;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+
+    .map-container iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      display: block;
+    }
+
+    .map-container.heatmap-active::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse at 30% 40%, rgba(229,115,115,0.55) 0%, rgba(229,115,115,0.3) 20%, transparent 50%),
+                  radial-gradient(ellipse at 70% 60%, rgba(255,183,77,0.45) 0%, rgba(255,183,77,0.25) 20%, transparent 45%),
+                  radial-gradient(ellipse at 50% 80%, rgba(129,199,132,0.4) 0%, rgba(129,199,132,0.2) 20%, transparent 40%);
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    .map-legend {
+      display: none;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 16px;
+      background: var(--color-surface);
+      border-bottom: 1px solid rgba(0,0,0,0.06);
+      flex-wrap: wrap;
+    }
+
+    .map-legend.visible {
+      display: flex;
+    }
+
+    .map-legend-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      margin-right: 4px;
+    }
+
+    .map-legend-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 12px;
+      color: var(--color-text);
+    }
+
+    .map-legend-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .map-legend-dot.low    { background: #81C784; }
+    .map-legend-dot.medium { background: #FFB74D; }
+    .map-legend-dot.high   { background: #E57373; }
+
+    .map-resources {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 16px 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .map-resources-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 2px;
+    }
+
+    .map-resource-card {
+      background: var(--color-surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .map-resource-icon {
+      font-size: 26px;
+      flex-shrink: 0;
+      line-height: 1;
+    }
+
+    .map-resource-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .map-resource-name {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--color-text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .map-resource-meta {
+      font-size: 12px;
+      color: #888;
+      margin-top: 2px;
+    }
+
+    .map-resource-call-btn {
+      background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+      color: #fff;
+      border: none;
+      border-radius: 20px;
+      padding: 8px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      min-height: 36px;
+      min-width: 64px;
+      cursor: pointer;
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      flex-shrink: 0;
+      transition: opacity 0.2s, transform 0.15s;
+    }
+
+    .map-resource-call-btn:active {
+      transform: scale(0.95);
+      opacity: 0.85;
+    }
+
+    /* ── Safe Chat Screen ── */
+    [data-screen="chat"] {
+      padding: 0;
+      padding-bottom: 80px;
+      display: none;
+      flex-direction: column;
+    }
+
+    [data-screen="chat"].active {
+      display: flex;
+    }
+
+    .chat-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 16px 16px 12px;
+      background: var(--color-surface);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      flex-shrink: 0;
+    }
+
+    .chat-back-btn {
+      background: none;
+      border: none;
+      font-size: 22px;
+      color: var(--color-secondary);
+      cursor: pointer;
+      min-width: 48px;
+      min-height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      transition: background 0.2s;
+      flex-shrink: 0;
+    }
+
+    .chat-back-btn:hover {
+      background: rgba(126,200,200,0.15);
+    }
+
+    .chat-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--color-text);
+      flex: 1;
+    }
+
+    .chat-ai-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: linear-gradient(135deg, rgba(200,182,226,0.25), rgba(126,200,200,0.25));
+      border: 1.5px solid var(--color-primary);
+      border-radius: 20px;
+      padding: 5px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #4a3570;
+      flex-shrink: 0;
+    }
+
+    .chat-ai-badge-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--color-secondary);
+      animation: chat-dot-pulse 1.5s ease-in-out infinite;
+    }
+
+    @keyframes chat-dot-pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.8); }
+    }
+
+    .chat-quick-options {
+      padding: 10px 16px 8px;
+      background: var(--color-bg);
+      border-bottom: 1px solid rgba(0,0,0,0.06);
+      flex-shrink: 0;
+    }
+
+    .chat-quick-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      margin-bottom: 8px;
+    }
+
+    .chat-quick-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .chat-quick-btn {
+      background: var(--color-surface);
+      border: 1.5px solid var(--color-primary);
+      border-radius: 20px;
+      padding: 7px 14px;
+      font-size: 13px;
+      font-weight: 500;
+      color: #4a3570;
+      cursor: pointer;
+      min-height: 36px;
+      transition: background 0.2s, color 0.2s, border-color 0.2s;
+      white-space: nowrap;
+    }
+
+    .chat-quick-btn:hover {
+      background: rgba(200,182,226,0.2);
+    }
+
+    .chat-quick-btn:active {
+      background: var(--color-primary);
+      color: #fff;
+      border-color: var(--color-primary);
+    }
+
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .chat-bubble-row {
+      display: flex;
+      align-items: flex-end;
+      gap: 8px;
+    }
+
+    .chat-bubble-row.user {
+      flex-direction: row-reverse;
+    }
+
+    .chat-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+
+    .chat-bubble {
+      max-width: 72%;
+      padding: 10px 14px;
+      border-radius: 18px;
+      font-size: 15px;
+      line-height: 1.5;
+      word-break: break-word;
+    }
+
+    .chat-bubble.bot {
+      background: var(--color-surface);
+      color: var(--color-text);
+      border-bottom-left-radius: 4px;
+      box-shadow: var(--shadow);
+    }
+
+    .chat-bubble.user {
+      background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+      color: #fff;
+      border-bottom-right-radius: 4px;
+    }
+
+    .chat-bubble-time {
+      font-size: 11px;
+      color: #aaa;
+      margin-top: 3px;
+      text-align: right;
+    }
+
+    .chat-bubble-row.bot .chat-bubble-time {
+      text-align: left;
+    }
+
+    .chat-typing-indicator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .chat-typing-dots {
+      display: flex;
+      gap: 4px;
+      padding: 10px 14px;
+      background: var(--color-surface);
+      border-radius: 18px;
+      border-bottom-left-radius: 4px;
+      box-shadow: var(--shadow);
+    }
+
+    .chat-typing-dots span {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--color-primary);
+      animation: chat-typing-bounce 1.2s ease-in-out infinite;
+    }
+
+    .chat-typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+    .chat-typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes chat-typing-bounce {
+      0%, 60%, 100% { transform: translateY(0); opacity: 0.5; }
+      30% { transform: translateY(-6px); opacity: 1; }
+    }
+
+    .chat-input-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 16px;
+      background: var(--color-surface);
+      box-shadow: 0 -2px 8px rgba(0,0,0,0.06);
+      flex-shrink: 0;
+    }
+
+    .chat-input {
+      flex: 1;
+      border: 2px solid #e0d8f0;
+      border-radius: 24px;
+      padding: 10px 16px;
+      font-size: 15px;
+      background: var(--color-bg);
+      color: var(--color-text);
+      outline: none;
+      transition: border-color 0.2s;
+      min-height: 44px;
+      font-family: inherit;
+      resize: none;
+    }
+
+    .chat-input:focus {
+      border-color: var(--color-primary);
+    }
+
+    .chat-send-btn {
+      background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+      color: #fff;
+      border: none;
+      border-radius: 50%;
+      width: 44px;
+      height: 44px;
+      min-width: 44px;
+      min-height: 44px;
+      font-size: 18px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.15s, opacity 0.2s;
+      flex-shrink: 0;
+    }
+
+    .chat-send-btn:active {
+      transform: scale(0.92);
+    }
+
+    .chat-send-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    /* ── Awareness Screen ── */
+    [data-screen="awareness"] {
+      padding: 0;
+      padding-bottom: 80px;
+      display: none;
+      flex-direction: column;
+    }
+
+    [data-screen="awareness"].active {
+      display: flex;
+    }
+
+    .awareness-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 16px 16px 12px;
+      background: var(--color-surface);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      flex-shrink: 0;
+    }
+
+    .awareness-back-btn {
+      background: none;
+      border: none;
+      font-size: 22px;
+      color: var(--color-secondary);
+      cursor: pointer;
+      min-width: 48px;
+      min-height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      transition: background 0.2s;
+      flex-shrink: 0;
+    }
+
+    .awareness-back-btn:hover {
+      background: rgba(126,200,200,0.15);
+    }
+
+    .awareness-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--color-text);
+      flex: 1;
+    }
+
+    .awareness-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .awareness-category-heading {
+      font-size: 13px;
+      font-weight: 700;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .awareness-category-heading::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: rgba(0,0,0,0.08);
+    }
+
+    .awareness-article-card {
+      background: var(--color-surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 10px;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+
+    .awareness-article-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    }
+
+    .awareness-article-top {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+
+    .awareness-article-icon {
+      font-size: 24px;
+      flex-shrink: 0;
+      line-height: 1;
+      margin-top: 2px;
+    }
+
+    .awareness-article-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .awareness-article-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--color-text);
+      line-height: 1.35;
+      margin-bottom: 4px;
+    }
+
+    .awareness-badge {
+      display: inline-block;
+      border-radius: 12px;
+      padding: 2px 10px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    .awareness-badge-legal {
+      background: rgba(200,182,226,0.3);
+      color: #6a3a9a;
+    }
+
+    .awareness-badge-safety {
+      background: rgba(126,200,200,0.3);
+      color: #1a7a7a;
+    }
+
+    .awareness-badge-selfdefense {
+      background: rgba(255,183,77,0.25);
+      color: #a05a00;
+    }
+
+    .awareness-article-desc {
+      font-size: 13px;
+      color: #777;
+      line-height: 1.5;
+    }
+
+    .awareness-read-btn {
+      align-self: flex-end;
+      background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+      color: #fff;
+      border: none;
+      border-radius: 20px;
+      padding: 8px 20px;
+      font-size: 13px;
+      font-weight: 600;
+      min-height: 36px;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.15s;
+    }
+
+    .awareness-read-btn:active {
+      transform: scale(0.95);
+      opacity: 0.85;
+    }
+
+    /* ── Article Detail Screen ── */
+    [data-screen="article"] {
+      padding: 0;
+      padding-bottom: 80px;
+      display: none;
+      flex-direction: column;
+    }
+
+    [data-screen="article"].active {
+      display: flex;
+    }
+
+    .article-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 16px 16px 12px;
+      background: var(--color-surface);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      flex-shrink: 0;
+    }
+
+    .article-back-btn {
+      background: none;
+      border: none;
+      font-size: 22px;
+      color: var(--color-secondary);
+      cursor: pointer;
+      min-width: 48px;
+      min-height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      transition: background 0.2s;
+      flex-shrink: 0;
+    }
+
+    .article-back-btn:hover {
+      background: rgba(126,200,200,0.15);
+    }
+
+    .article-header-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--color-text);
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .article-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px 16px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .article-hero-icon {
+      font-size: 48px;
+      text-align: center;
+      line-height: 1;
+    }
+
+    .article-full-title {
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--color-text);
+      line-height: 1.3;
+    }
+
+    .article-content-text {
+      font-size: 15px;
+      color: var(--color-text);
+      line-height: 1.75;
+    }
+
+    .article-content-text p + p {
+      margin-top: 14px;
+    }
+
+    .article-divider {
+      height: 1px;
+      background: rgba(0,0,0,0.07);
+      margin: 4px 0;
+    }
+
+    /* ── Settings Screen ── */
+    [data-screen="settings"] {
+      padding: 0;
+      padding-bottom: 80px;
+      display: none;
+      flex-direction: column;
+    }
+
+    [data-screen="settings"].active {
+      display: flex;
+    }
+
+    .settings-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 16px 16px 12px;
+      background: var(--color-surface);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      flex-shrink: 0;
+    }
+
+    .settings-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--color-text);
+      flex: 1;
+    }
+
+    .settings-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .settings-section-card {
+      background: var(--color-surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .settings-section-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 16px 10px;
+      border-bottom: 1px solid rgba(0,0,0,0.06);
+    }
+
+    .settings-section-icon {
+      font-size: 20px;
+      line-height: 1;
+    }
+
+    .settings-section-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--color-text);
+      letter-spacing: 0.2px;
+    }
+
+    .settings-section-body {
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .settings-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      min-height: 48px;
+    }
+
+    .settings-row-label {
+      font-size: 15px;
+      color: var(--color-text);
+      flex: 1;
+    }
+
+    .settings-row-sublabel {
+      font-size: 12px;
+      color: #888;
+      margin-top: 2px;
+    }
+
+    .settings-select {
+      border: 2px solid #e0d8f0;
+      border-radius: 10px;
+      padding: 8px 12px;
+      font-size: 15px;
+      background: var(--color-bg);
+      color: var(--color-text);
+      outline: none;
+      min-height: 44px;
+      min-width: 140px;
+      cursor: pointer;
+      transition: border-color 0.2s;
+      font-family: inherit;
+    }
+
+    .settings-select:focus {
+      border-color: var(--color-primary);
+    }
+
+    /* Toggle switch */
+    .settings-toggle {
+      position: relative;
+      width: 50px;
+      height: 28px;
+      flex-shrink: 0;
+    }
+
+    .settings-toggle input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+      position: absolute;
+    }
+
+    .settings-toggle-slider {
+      position: absolute;
+      inset: 0;
+      background: #ccc;
+      border-radius: 28px;
+      cursor: pointer;
+      transition: background 0.25s;
+    }
+
+    .settings-toggle-slider::before {
+      content: '';
+      position: absolute;
+      width: 22px;
+      height: 22px;
+      left: 3px;
+      top: 3px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform 0.25s;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+    }
+
+    .settings-toggle input:checked + .settings-toggle-slider {
+      background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+    }
+
+    .settings-toggle input:checked + .settings-toggle-slider::before {
+      transform: translateX(22px);
+    }
+
+    .settings-toggle input:focus-visible + .settings-toggle-slider {
+      outline: 2px solid var(--color-primary);
+      outline-offset: 2px;
+    }
+
+    /* Slider (range) */
+    .settings-slider-row {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .settings-slider-label-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .settings-slider-value {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--color-primary);
+      min-width: 60px;
+      text-align: right;
+    }
+
+    .settings-range {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 6px;
+      border-radius: 3px;
+      background: linear-gradient(to right, var(--color-primary) 0%, var(--color-primary) var(--range-pct, 0%), #e0d8f0 var(--range-pct, 0%), #e0d8f0 100%);
+      outline: none;
+      cursor: pointer;
+    }
+
+    .settings-range::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: var(--color-primary);
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+      transition: transform 0.15s;
+    }
+
+    .settings-range::-webkit-slider-thumb:active {
+      transform: scale(1.2);
+    }
+
+    .settings-range::-moz-range-thumb {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: var(--color-primary);
+      cursor: pointer;
+      border: none;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    }
+
+    /* Emergency contacts */
+    .settings-contact-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(0,0,0,0.06);
+    }
+
+    .settings-contact-item:last-child {
+      border-bottom: none;
+    }
+
+    .settings-contact-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      flex-shrink: 0;
+      color: #fff;
+    }
+
+    .settings-contact-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .settings-contact-name {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--color-text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .settings-contact-phone {
+      font-size: 13px;
+      color: #888;
+      margin-top: 1px;
+    }
+
+    .settings-contact-actions {
+      display: flex;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    .settings-icon-btn {
+      background: none;
+      border: none;
+      font-size: 16px;
+      cursor: pointer;
+      min-width: 36px;
+      min-height: 36px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s;
+      padding: 0;
+    }
+
+    .settings-icon-btn:hover {
+      background: rgba(0,0,0,0.06);
+    }
+
+    .settings-icon-btn.danger:hover {
+      background: rgba(229,115,115,0.12);
+    }
+
+    .settings-add-contact-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      background: none;
+      border: 2px dashed var(--color-primary);
+      border-radius: 12px;
+      padding: 12px;
+      font-size: 14px;
+      font-weight: 600;
+      color: #6a3a9a;
+      cursor: pointer;
+      min-height: 48px;
+      width: 100%;
+      transition: background 0.2s;
+    }
+
+    .settings-add-contact-btn:hover {
+      background: rgba(200,182,226,0.1);
+    }
+
+    .settings-contact-form {
+      background: var(--color-bg);
+      border-radius: 12px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      border: 1.5px solid var(--color-primary);
+    }
+
+    .settings-contact-form-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--color-text);
+    }
+
+    .settings-input {
+      border: 2px solid #e0d8f0;
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 15px;
+      background: var(--color-surface);
+      color: var(--color-text);
+      outline: none;
+      min-height: 44px;
+      width: 100%;
+      font-family: inherit;
+      transition: border-color 0.2s;
+    }
+
+    .settings-input:focus {
+      border-color: var(--color-primary);
+    }
+
+    .settings-contact-form-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .settings-btn-primary {
+      flex: 1;
+      background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+      color: #fff;
+      border: none;
+      border-radius: 24px;
+      padding: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      min-height: 44px;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.15s;
+    }
+
+    .settings-btn-primary:active {
+      transform: scale(0.97);
+    }
+
+    .settings-btn-secondary {
+      background: none;
+      border: 2px solid #e0d8f0;
+      border-radius: 24px;
+      padding: 10px 16px;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--color-text);
+      min-height: 44px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .settings-btn-secondary:hover {
+      background: rgba(0,0,0,0.04);
+    }
+
+    /* Data management */
+    .settings-danger-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      background: none;
+      border: 2px solid var(--color-danger);
+      border-radius: 28px;
+      padding: 14px;
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--color-danger);
+      cursor: pointer;
+      min-height: 52px;
+      width: 100%;
+      transition: background 0.2s, transform 0.15s;
+    }
+
+    .settings-danger-btn:hover {
+      background: rgba(229,115,115,0.08);
+    }
+
+    .settings-danger-btn:active {
+      transform: scale(0.97);
+    }
+
+    /* Theme segment control */
+    .settings-theme-group {
+      display: flex;
+      border: 2px solid #e0d8f0;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .settings-theme-option {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      padding: 10px 6px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      color: #888;
+      min-height: 56px;
+      transition: background 0.2s, color 0.2s;
+      border-right: 1px solid #e0d8f0;
+    }
+
+    .settings-theme-option:last-child {
+      border-right: none;
+    }
+
+    .settings-theme-option.active {
+      background: linear-gradient(135deg, rgba(200,182,226,0.3), rgba(126,200,200,0.3));
+      color: var(--color-text);
+    }
+
+    .settings-theme-option-icon {
+      font-size: 20px;
+    }
+
+    /* ── Calculator Buttons ── */
+    .calc-btn {
+      background: #f5f5f5;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 12px 8px;
+      font-size: 18px;
+      font-weight: 500;
+      cursor: pointer;
+      min-height: 48px;
+      min-width: 48px;
+      transition: background 0.15s, transform 0.1s;
+      color: #333;
+    }
+
+    .calc-btn:hover {
+      background: #e8e8e8;
+    }
+
+    .calc-btn:active {
+      background: #d0d0d0;
+      transform: scale(0.95);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── Shared Components ── -->
+  <nav id="navbar" role="navigation" aria-label="Main navigation">
+    <button onclick="Router.navigate('dashboard')" aria-label="Home" data-tab="dashboard">🏠<span class="tab-label">Home</span></button>
+    <button onclick="Router.navigate('report')" aria-label="Report" data-tab="report">📋<span class="tab-label">Report</span></button>
+    <button onclick="Router.navigate('chat')" aria-label="Chat" data-tab="chat">💬<span class="tab-label">Chat</span></button>
+    <button onclick="Router.navigate('map')" aria-label="Map" data-tab="map">🗺️<span class="tab-label">Map</span></button>
+    <button onclick="Router.navigate('settings')" aria-label="Settings" data-tab="settings">⚙️<span class="tab-label">Settings</span></button>
+  </nav>
+
+  <button id="sos-button" onclick="SOS.activate()" aria-label="SOS Emergency" title="SOS">🆘<br>SOS</button>
+  <button id="quickexit-button" onclick="QuickExit.activate()" aria-label="Quick Exit" title="Quick Exit">✕</button>
+
+  <div id="toast"></div>
+
+  <div id="modal-overlay">
+    <div id="modal-box">
+      <p id="modal-message"></p>
+      <div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end;">
+        <button id="modal-cancel" onclick="Modal.hide()">Cancel</button>
+        <button id="modal-confirm">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Quick Exit Calculator Screen ── -->
+  <div id="quickexit-screen">
+    <div style="background:#fff;border-radius:12px;padding:24px;width:280px;box-shadow:0 4px 20px rgba(0,0,0,0.15);">
+      <div id="calc-display" style="background:#222;color:#fff;padding:12px;border-radius:8px;text-align:right;font-size:24px;margin-bottom:12px;min-height:48px;">0</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">
+        <button class="calc-btn" onclick="calcInput('7')">7</button>
+        <button class="calc-btn" onclick="calcInput('8')">8</button>
+        <button class="calc-btn" onclick="calcInput('9')">9</button>
+        <button class="calc-btn" onclick="calcInput('/')">÷</button>
+        <button class="calc-btn" onclick="calcInput('4')">4</button>
+        <button class="calc-btn" onclick="calcInput('5')">5</button>
+        <button class="calc-btn" onclick="calcInput('6')">6</button>
+        <button class="calc-btn" onclick="calcInput('*')">×</button>
+        <button class="calc-btn" onclick="calcInput('1')">1</button>
+        <button class="calc-btn" onclick="calcInput('2')">2</button>
+        <button class="calc-btn" onclick="calcInput('3')">3</button>
+        <button class="calc-btn" onclick="calcInput('-')">−</button>
+        <button class="calc-btn" onclick="calcInput('0')">0</button>
+        <button class="calc-btn" onclick="calcInput('.')">.</button>
+        <button class="calc-btn" id="calc-equals" onclick="calcEquals()">=</button>
+        <button class="calc-btn" onclick="calcInput('+')">+</button>
+      </div>
+      <button class="calc-btn" onclick="calcClear()" style="width:100%;margin-top:8px;">C</button>
+    </div>
+  </div>
+
+  <!-- ── Screens ── -->
+
+  <section data-screen="onboarding" aria-label="Onboarding">
+    <div class="onboarding-header">
+      <button class="onboarding-skip-btn" onclick="Onboarding.finish()" aria-label="Skip onboarding">Skip</button>
+    </div>
+
+    <div class="onboarding-slides-wrapper" id="onboarding-slides-wrapper">
+      <div class="onboarding-slides-track" id="onboarding-slides-track">
+
+        <!-- Slide 1 -->
+        <div class="onboarding-slide" role="group" aria-label="Slide 1 of 3">
+          <div class="onboarding-slide-icon" aria-hidden="true">🛡️</div>
+          <div class="onboarding-slide-card">
+            <h2 class="onboarding-slide-title">Your Safety, Your Voice</h2>
+            <p class="onboarding-slide-desc">Report harassment anonymously — no identity required. Your story matters, and you stay in control.</p>
+            <div class="onboarding-slide-tags">
+              <span class="onboarding-tag">Anonymous</span>
+              <span class="onboarding-tag">Secure</span>
+              <span class="onboarding-tag">Private</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Slide 2 -->
+        <div class="onboarding-slide" role="group" aria-label="Slide 2 of 3">
+          <div class="onboarding-slide-icon" aria-hidden="true">🆘</div>
+          <div class="onboarding-slide-card">
+            <h2 class="onboarding-slide-title">Emergency Help, One Tap Away</h2>
+            <p class="onboarding-slide-desc">Activate SOS to alert your contacts instantly. Find nearby police stations, NGOs, and helplines on the map. Chat with a counselor anytime.</p>
+            <div class="onboarding-slide-tags">
+              <span class="onboarding-tag">SOS Button</span>
+              <span class="onboarding-tag">Nearby Resources</span>
+              <span class="onboarding-tag">Safe Chat</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Slide 3 -->
+        <div class="onboarding-slide" role="group" aria-label="Slide 3 of 3">
+          <div class="onboarding-slide-icon" aria-hidden="true">🔒</div>
+          <div class="onboarding-slide-card">
+            <h2 class="onboarding-slide-title">Your Privacy is Protected</h2>
+            <p class="onboarding-slide-desc">All data is end-to-end encrypted. Use anonymous mode with no sign-up. Quick Exit hides the app in one tap if you ever feel unsafe.</p>
+            <div class="onboarding-slide-tags">
+              <span class="onboarding-tag">E2E Encryption</span>
+              <span class="onboarding-tag">Anonymous Mode</span>
+              <span class="onboarding-tag">Quick Exit</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="onboarding-footer">
+      <div class="onboarding-dots" id="onboarding-dots" role="tablist" aria-label="Slide indicators">
+        <div class="onboarding-dot active" role="tab" aria-selected="true" aria-label="Slide 1"></div>
+        <div class="onboarding-dot" role="tab" aria-selected="false" aria-label="Slide 2"></div>
+        <div class="onboarding-dot" role="tab" aria-selected="false" aria-label="Slide 3"></div>
+      </div>
+      <button class="onboarding-next-btn" id="onboarding-next-btn" onclick="Onboarding.next()" aria-label="Next slide">Next</button>
+    </div>
+  </section>
+
+  <section data-screen="auth" aria-label="Sign in">
+    <div class="auth-container">
+      <div class="auth-header">
+        <div class="auth-logo" aria-hidden="true">🛡️</div>
+        <h1 class="auth-title">SafeVoice</h1>
+        <p class="auth-subtitle">Your safety, your voice</p>
+      </div>
+
+      <!-- Method selector cards -->
+      <div id="auth-methods" class="auth-methods" role="group" aria-label="Sign in options">
+        <button class="auth-card" id="auth-anon-btn" onclick="Auth.chooseAnonymous()" aria-label="Continue anonymously">
+          <span class="auth-card-icon" aria-hidden="true">🕵️</span>
+          <div class="auth-card-body">
+            <span class="auth-card-title">Continue Anonymously</span>
+            <span class="auth-card-desc">No sign-up required. Full access, zero identity.</span>
+          </div>
+          <span class="auth-card-arrow" aria-hidden="true">›</span>
+        </button>
+
+        <button class="auth-card" id="auth-email-btn" onclick="Auth.chooseEmail()" aria-label="Sign in with email">
+          <span class="auth-card-icon" aria-hidden="true">✉️</span>
+          <div class="auth-card-body">
+            <span class="auth-card-title">Sign in with Email</span>
+            <span class="auth-card-desc">Use your email address to sign in.</span>
+          </div>
+          <span class="auth-card-arrow" aria-hidden="true">›</span>
+        </button>
+
+        <button class="auth-card" id="auth-phone-btn" onclick="Auth.choosePhone()" aria-label="Sign in with phone">
+          <span class="auth-card-icon" aria-hidden="true">📱</span>
+          <div class="auth-card-body">
+            <span class="auth-card-title">Sign in with Phone</span>
+            <span class="auth-card-desc">Verify with a one-time code sent to your number.</span>
+          </div>
+          <span class="auth-card-arrow" aria-hidden="true">›</span>
+        </button>
+      </div>
+
+      <!-- Email form (hidden by default) -->
+      <div id="auth-email-form" class="auth-form" hidden aria-label="Email sign in form">
+        <button class="auth-back-btn" onclick="Auth.showMethods()" aria-label="Back to sign in options">← Back</button>
+        <h2 class="auth-form-title">Sign in with Email</h2>
+        <label class="auth-label" for="auth-email-input">Email address</label>
+        <input
+          id="auth-email-input"
+          class="auth-input"
+          type="email"
+          placeholder="you@example.com"
+          autocomplete="email"
+          aria-required="true"
+        />
+        <p id="auth-email-error" class="auth-error" hidden role="alert"></p>
+        <button class="auth-submit-btn" onclick="Auth.submitEmail()" aria-label="Continue with email">Continue</button>
+      </div>
+
+      <!-- Phone form (hidden by default) -->
+      <div id="auth-phone-form" class="auth-form" hidden aria-label="Phone sign in form">
+        <button class="auth-back-btn" onclick="Auth.showMethods()" aria-label="Back to sign in options">← Back</button>
+        <h2 class="auth-form-title">Sign in with Phone</h2>
+        <label class="auth-label" for="auth-phone-input">Phone number</label>
+        <input
+          id="auth-phone-input"
+          class="auth-input"
+          type="tel"
+          placeholder="+1 555 000 0000"
+          autocomplete="tel"
+          aria-required="true"
+        />
+        <p id="auth-phone-error" class="auth-error" hidden role="alert"></p>
+        <button class="auth-submit-btn" id="auth-send-otp-btn" onclick="Auth.sendOTP()" aria-label="Send OTP">Send OTP</button>
+      </div>
+
+      <!-- OTP form (hidden by default) -->
+      <div id="auth-otp-form" class="auth-form" hidden aria-label="OTP verification form">
+        <button class="auth-back-btn" onclick="Auth.showPhone()" aria-label="Back to phone entry">← Back</button>
+        <h2 class="auth-form-title">Enter OTP</h2>
+        <p class="auth-otp-hint">A 6-digit code was sent to <strong id="auth-otp-phone-display"></strong></p>
+        <label class="auth-label" for="auth-otp-input">One-time password</label>
+        <input
+          id="auth-otp-input"
+          class="auth-input auth-otp-input"
+          type="text"
+          inputmode="numeric"
+          pattern="[0-9]{6}"
+          maxlength="6"
+          placeholder="000000"
+          autocomplete="one-time-code"
+          aria-required="true"
+        />
+        <p id="auth-otp-error" class="auth-error" hidden role="alert"></p>
+        <div class="auth-otp-timer-row">
+          <span class="auth-otp-timer-label">Code expires in</span>
+          <span id="auth-otp-countdown" class="auth-otp-countdown" aria-live="polite">05:00</span>
+        </div>
+        <button class="auth-submit-btn" id="auth-verify-otp-btn" onclick="Auth.verifyOTP()" aria-label="Verify OTP">Verify</button>
+        <button class="auth-resend-btn" id="auth-resend-btn" onclick="Auth.resendOTP()" hidden aria-label="Request new OTP">Request new OTP</button>
+      </div>
+    </div>
+  </section>
+
+  <section data-screen="dashboard" aria-label="Dashboard">
+    <!-- Dashboard header -->
+    <header class="dashboard-header">
+      <div class="dashboard-header-row">
+        <span class="dashboard-app-name">SafeVoice</span>
+        <div class="dashboard-header-actions">
+          <button
+            class="dashboard-theme-btn"
+            id="dashboard-theme-btn"
+            onclick="Theme.toggle(); Dashboard.updateThemeIcon()"
+            aria-label="Toggle theme"
+            title="Toggle dark/light mode"
+          >🌙</button>
+        </div>
+      </div>
+      <p class="dashboard-tagline">You are safe here</p>
+    </header>
+
+    <!-- Quick-action cards -->
+    <div class="dashboard-body">
+      <div class="dashboard-grid" role="list" aria-label="Quick actions">
+
+        <!-- Submit Report -->
+        <button
+          class="dashboard-card"
+          onclick="Router.navigate('report')"
+          aria-label="Submit a report"
+          role="listitem"
+        >
+          <span class="dashboard-card-icon" aria-hidden="true">📋</span>
+          <span class="dashboard-card-label">Submit Report</span>
+        </button>
+
+        <!-- Help Map -->
+        <button
+          class="dashboard-card"
+          onclick="Router.navigate('map')"
+          aria-label="Open help map"
+          role="listitem"
+        >
+          <span class="dashboard-card-icon" aria-hidden="true">🗺️</span>
+          <span class="dashboard-card-label">Help Map</span>
+        </button>
+
+        <!-- Safe Chat -->
+        <button
+          class="dashboard-card"
+          onclick="Router.navigate('chat')"
+          aria-label="Open safe chat"
+          role="listitem"
+        >
+          <span class="dashboard-card-icon" aria-hidden="true">💬</span>
+          <span class="dashboard-card-label">Safe Chat</span>
+        </button>
+
+        <!-- Track Complaint -->
+        <button
+          class="dashboard-card"
+          onclick="Router.navigate('track')"
+          aria-label="Track a complaint"
+          role="listitem"
+        >
+          <span class="dashboard-card-icon" aria-hidden="true">🔍</span>
+          <span class="dashboard-card-label">Track Complaint</span>
+        </button>
+
+        <!-- Awareness — full-width row -->
+        <button
+          class="dashboard-card dashboard-card-wide"
+          onclick="Router.navigate('awareness')"
+          aria-label="Open awareness content"
+          role="listitem"
+        >
+          <span class="dashboard-card-icon" aria-hidden="true">📚</span>
+          <span class="dashboard-card-label">Awareness &amp; Resources</span>
+        </button>
+
+      </div>
+
+      <!-- SOS card — prominent, below grid -->
+      <button
+        class="dashboard-card dashboard-card-sos"
+        onclick="SOS.activate()"
+        aria-label="Activate SOS emergency"
+        style="width:100%;flex-direction:row;justify-content:center;gap:12px;min-height:64px;"
+      >
+        <span class="dashboard-card-icon" aria-hidden="true">🆘</span>
+        <span class="dashboard-card-label" style="font-size:18px;">SOS Emergency</span>
+      </button>
+    </div>
+  </section>
+
+  <section data-screen="report" aria-label="Submit a report">
+    <div class="report-screen">
+      <div class="report-header">
+        <button class="report-back-btn" onclick="Router.navigate('dashboard')" aria-label="Back to dashboard">←</button>
+        <h1 class="report-title">Submit Report</h1>
+      </div>
+
+      <form class="report-form" id="report-form" novalidate onsubmit="Report.submit(event)">
+
+        <!-- Field 1: Harassment Type -->
+        <div class="report-field">
+          <label class="report-label" for="report-type">
+            Harassment Type<span class="report-required" aria-hidden="true">*</span>
+          </label>
+          <select id="report-type" class="report-select" aria-required="true" aria-describedby="report-type-error">
+            <option value="">— Select type —</option>
+            <option value="Workplace">Workplace</option>
+            <option value="Public">Public</option>
+            <option value="Online">Online</option>
+            <option value="Domestic">Domestic</option>
+            <option value="Other">Other</option>
+          </select>
+          <p id="report-type-error" class="report-error" role="alert" aria-live="polite"></p>
+        </div>
+
+        <!-- Field 2: Description + Microphone -->
+        <div class="report-field">
+          <label class="report-label" for="report-description">
+            Description<span class="report-required" aria-hidden="true">*</span>
+          </label>
+          <div class="report-desc-row">
+            <textarea
+              id="report-description"
+              class="report-textarea"
+              placeholder="Describe what happened…"
+              aria-required="true"
+              aria-describedby="report-description-error"
+              rows="4"
+            ></textarea>
+            <button
+              type="button"
+              id="report-mic-btn"
+              class="report-mic-btn"
+              onclick="Report.toggleMic()"
+              aria-label="Start voice input"
+              title="Voice to text"
+            >🎤</button>
+          </div>
+          <p id="report-description-error" class="report-error" role="alert" aria-live="polite"></p>
+        </div>
+
+        <!-- Field 3: Location -->
+        <div class="report-field">
+          <label class="report-label" for="report-location">Location <span style="font-weight:400;color:#888;">(optional)</span></label>
+          <div class="report-location-row">
+            <input
+              id="report-location"
+              class="report-input"
+              type="text"
+              placeholder="Enter location or use GPS"
+              aria-label="Location"
+            />
+            <button
+              type="button"
+              id="report-gps-btn"
+              class="report-gps-btn"
+              onclick="Report.detectLocation()"
+              aria-label="Auto-detect location via GPS"
+              title="Detect my location"
+            >📍</button>
+          </div>
+        </div>
+
+        <!-- Field 4: Date/Time -->
+        <div class="report-field">
+          <label class="report-label" for="report-datetime">Date &amp; Time</label>
+          <input
+            id="report-datetime"
+            class="report-input"
+            type="datetime-local"
+            aria-label="Date and time of incident"
+          />
+        </div>
+
+        <!-- Field 5: Evidence -->
+        <div class="report-field">
+          <span class="report-label">Evidence <span style="font-weight:400;color:#888;">(optional, max 50 MB)</span></span>
+          <label class="report-file-label" for="report-evidence" aria-label="Attach evidence files">
+            <span aria-hidden="true">📎</span>
+            <span id="report-evidence-label-text">Attach images, audio, or video</span>
+          </label>
+          <input
+            id="report-evidence"
+            type="file"
+            multiple
+            accept="image/*,audio/*,video/*"
+            style="display:none;"
+            onchange="Report.onFilesChange()"
+            aria-label="Evidence files"
+          />
+          <p id="report-evidence-names" class="report-file-names" aria-live="polite"></p>
+          <p id="report-evidence-error" class="report-error" role="alert" aria-live="polite"></p>
+        </div>
+
+        <!-- Field 6: Submit -->
+        <button type="submit" class="report-submit-btn" id="report-submit-btn">
+          Submit Report
+        </button>
+
+      </form>
+    </div>
+  </section>
+
+  <section data-screen="report-confirm" aria-label="Report submitted">
+    <div class="confirm-screen">
+      <div class="confirm-icon" aria-hidden="true">✅</div>
+      <div class="confirm-card">
+        <h1 class="confirm-title">Report Submitted</h1>
+        <p class="confirm-subtitle">Your complaint has been recorded. Keep your Complaint ID safe — you'll need it to track progress.</p>
+        <span class="confirm-id-label">Complaint ID</span>
+        <span class="confirm-id-value" id="confirm-complaint-id" aria-live="polite">—</span>
+        <p class="confirm-hint">Screenshot or note this ID to track your complaint status later.</p>
+        <button class="confirm-done-btn" onclick="Router.navigate('dashboard')" aria-label="Return to dashboard">Done</button>
+      </div>
+    </div>
+  </section>
+
+  <section data-screen="track" aria-label="Track complaint">
+    <div class="report-screen">
+      <div class="report-header">
+        <button class="report-back-btn" onclick="Router.navigate('dashboard')" aria-label="Back to dashboard">←</button>
+        <h1 class="report-title">Track Complaint</h1>
+      </div>
+
+      <!-- Lookup form -->
+      <div class="card" style="display:flex;flex-direction:column;gap:12px;">
+        <label class="report-label" for="track-id-input">Complaint ID</label>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input
+            id="track-id-input"
+            class="report-input"
+            type="text"
+            placeholder="e.g. SV-A3F9K2"
+            maxlength="9"
+            autocomplete="off"
+            aria-label="Enter Complaint ID"
+            aria-describedby="track-id-hint"
+            style="flex:1;text-transform:uppercase;letter-spacing:0.05em;"
+            oninput="this.value=this.value.toUpperCase()"
+            onkeydown="if(event.key==='Enter')Track.lookup()"
+          />
+          <button
+            onclick="Track.lookup()"
+            aria-label="Look up complaint"
+            style="background:linear-gradient(135deg,var(--color-primary),var(--color-secondary));color:#fff;border:none;border-radius:28px;padding:0 20px;font-size:15px;font-weight:600;min-height:48px;min-width:80px;cursor:pointer;box-shadow:0 4px 14px rgba(200,182,226,0.45);transition:transform 0.15s;"
+          >Lookup</button>
+        </div>
+        <p id="track-id-hint" style="font-size:13px;color:#888;margin:0;">Enter the Complaint ID shown on your confirmation screen.</p>
+      </div>
+
+      <!-- Result area -->
+      <div id="track-result" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <section data-screen="map" aria-label="Help Map">
+
+    <!-- Header -->
+    <div class="map-header">
+      <button class="map-back-btn" onclick="Router.navigate('dashboard')" aria-label="Back to dashboard">←</button>
+      <h1 class="map-title">Help Map</h1>
+      <button
+        class="map-heatmap-btn"
+        id="map-heatmap-btn"
+        onclick="HelpMap.toggleHeatmap()"
+        aria-pressed="false"
+        aria-label="Toggle heatmap overlay"
+      >🌡️ Heatmap</button>
+    </div>
+
+    <!-- OpenStreetMap iframe (Mumbai area, no API key) -->
+    <div class="map-container" id="map-container">
+      <iframe
+        id="map-iframe"
+        src="https://www.openstreetmap.org/export/embed.html?bbox=72.8,18.9,73.0,19.1&layer=mapnik"
+        title="Map of nearby resources"
+        aria-label="OpenStreetMap showing nearby help resources"
+        loading="lazy"
+      ></iframe>
+    </div>
+
+    <!-- Heatmap legend (shown when heatmap is active) -->
+    <div class="map-legend" id="map-legend" aria-label="Heatmap legend" aria-hidden="true">
+      <span class="map-legend-label">Incidents:</span>
+      <span class="map-legend-item"><span class="map-legend-dot low" aria-hidden="true"></span>Low</span>
+      <span class="map-legend-item"><span class="map-legend-dot medium" aria-hidden="true"></span>Medium</span>
+      <span class="map-legend-item"><span class="map-legend-dot high" aria-hidden="true"></span>High</span>
+    </div>
+
+    <!-- Scrollable resource cards -->
+    <div class="map-resources" role="list" aria-label="Nearby help resources">
+      <p class="map-resources-title">Nearby Resources</p>
+
+      <!-- 1. Andheri Police Station -->
+      <div class="map-resource-card" role="listitem">
+        <span class="map-resource-icon" aria-hidden="true">🚔</span>
+        <div class="map-resource-info">
+          <div class="map-resource-name">Andheri Police Station</div>
+          <div class="map-resource-meta">Police &nbsp;·&nbsp; 0.8 km away</div>
+        </div>
+        <a class="map-resource-call-btn" href="tel:100" aria-label="Call Andheri Police Station">📞 Call</a>
+      </div>
+
+      <!-- 2. iCall NGO -->
+      <div class="map-resource-card" role="listitem">
+        <span class="map-resource-icon" aria-hidden="true">🏥</span>
+        <div class="map-resource-info">
+          <div class="map-resource-name">iCall NGO</div>
+          <div class="map-resource-meta">NGO &nbsp;·&nbsp; 1.2 km away</div>
+        </div>
+        <a class="map-resource-call-btn" href="tel:9152987821" aria-label="Call iCall NGO">📞 Call</a>
+      </div>
+
+      <!-- 3. Women's Helpline -->
+      <div class="map-resource-card" role="listitem">
+        <span class="map-resource-icon" aria-hidden="true">📞</span>
+        <div class="map-resource-info">
+          <div class="map-resource-name">Women's Helpline</div>
+          <div class="map-resource-meta">Helpline &nbsp;·&nbsp; Available now</div>
+        </div>
+        <a class="map-resource-call-btn" href="tel:1091" aria-label="Call Women's Helpline 1091">📞 Call</a>
+      </div>
+
+      <!-- 4. Bandra Police Station -->
+      <div class="map-resource-card" role="listitem">
+        <span class="map-resource-icon" aria-hidden="true">🚔</span>
+        <div class="map-resource-info">
+          <div class="map-resource-name">Bandra Police Station</div>
+          <div class="map-resource-meta">Police &nbsp;·&nbsp; 2.1 km away</div>
+        </div>
+        <a class="map-resource-call-btn" href="tel:02226551234" aria-label="Call Bandra Police Station">📞 Call</a>
+      </div>
+
+      <!-- 5. Snehi NGO -->
+      <div class="map-resource-card" role="listitem">
+        <span class="map-resource-icon" aria-hidden="true">🏥</span>
+        <div class="map-resource-info">
+          <div class="map-resource-name">Snehi NGO</div>
+          <div class="map-resource-meta">NGO &nbsp;·&nbsp; 1.8 km away</div>
+        </div>
+        <a class="map-resource-call-btn" href="tel:04424640050" aria-label="Call Snehi NGO">📞 Call</a>
+      </div>
+
+      <!-- 6. National Emergency -->
+      <div class="map-resource-card" role="listitem">
+        <span class="map-resource-icon" aria-hidden="true">📞</span>
+        <div class="map-resource-info">
+          <div class="map-resource-name">National Emergency</div>
+          <div class="map-resource-meta">Helpline &nbsp;·&nbsp; Available now</div>
+        </div>
+        <a class="map-resource-call-btn" href="tel:112" aria-label="Call National Emergency 112">📞 Call</a>
+      </div>
+
+    </div>
+  </section>
+
+  <section data-screen="chat" aria-label="Safe Chat">
+
+    <!-- Header -->
+    <div class="chat-header">
+      <button class="chat-back-btn" onclick="Chat.endSession(); Router.navigate('dashboard')" aria-label="Back to dashboard">←</button>
+      <h1 class="chat-title">Safe Chat</h1>
+      <div class="chat-ai-badge" id="chat-ai-badge" aria-label="AI assistant active">
+        <span class="chat-ai-badge-dot" aria-hidden="true"></span>
+        🤖 AI mode
+      </div>
+    </div>
+
+    <!-- Quick-response options -->
+    <div class="chat-quick-options" id="chat-quick-options" aria-label="Quick response options">
+      <div class="chat-quick-label">Quick options</div>
+      <div class="chat-quick-buttons" role="group" aria-label="Quick response buttons">
+        <button class="chat-quick-btn" onclick="Chat.sendMessage('I need legal help')" aria-label="I need legal help">⚖️ Legal help</button>
+        <button class="chat-quick-btn" onclick="Chat.sendMessage('I feel unsafe right now')" aria-label="I feel unsafe right now">🛡️ Feel unsafe</button>
+        <button class="chat-quick-btn" onclick="Chat.sendMessage('I want to file a report')" aria-label="I want to file a report">📋 File report</button>
+      </div>
+    </div>
+
+    <!-- Message list -->
+    <div class="chat-messages" id="chat-messages" role="log" aria-live="polite" aria-label="Chat messages"></div>
+
+    <!-- Input bar -->
+    <div class="chat-input-bar">
+      <input
+        id="chat-input"
+        class="chat-input"
+        type="text"
+        placeholder="Type a message…"
+        aria-label="Type a message"
+        autocomplete="off"
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();Chat.sendMessage();}"
+      />
+      <button
+        id="chat-send-btn"
+        class="chat-send-btn"
+        onclick="Chat.sendMessage()"
+        aria-label="Send message"
+      >➤</button>
+    </div>
+
+  </section>
+
+  <section data-screen="awareness" aria-label="Awareness and Resources">
+
+    <div class="awareness-header">
+      <button class="awareness-back-btn" onclick="Router.navigate('dashboard')" aria-label="Back to dashboard">←</button>
+      <h1 class="awareness-title">📚 Awareness</h1>
+    </div>
+
+    <div class="awareness-body" id="awareness-body">
+      <!-- Populated by Awareness.init() -->
+    </div>
+
+  </section>
+
+  <section data-screen="article" aria-label="Article Detail">
+
+    <div class="article-header">
+      <button class="article-back-btn" onclick="Router.navigate('awareness')" aria-label="Back to awareness">←</button>
+      <h2 class="article-header-title" id="article-header-title">Article</h2>
+    </div>
+
+    <div class="article-body" id="article-body">
+      <!-- Populated by Awareness.renderArticle() -->
+    </div>
+
+  </section>
+
+  <section data-screen="settings" aria-label="Settings">
+
+    <div class="settings-header">
+      <h1 class="settings-title">⚙️ Settings</h1>
+    </div>
+
+    <div class="settings-body">
+
+      <!-- 1. Language -->
+      <div class="settings-section-card" aria-label="Language settings">
+        <div class="settings-section-header">
+          <span class="settings-section-icon" aria-hidden="true">🌐</span>
+          <span class="settings-section-title">Language</span>
+        </div>
+        <div class="settings-section-body">
+          <div class="settings-row">
+            <div>
+              <div class="settings-row-label">App Language</div>
+              <div class="settings-row-sublabel">Choose your preferred language</div>
+            </div>
+            <select
+              id="settings-language-select"
+              class="settings-select"
+              aria-label="Select language"
+              onchange="Settings.saveLanguage(this.value)"
+            >
+              <option value="en">English</option>
+              <option value="hi">हिन्दी (Hindi)</option>
+              <option value="ta">தமிழ் (Tamil)</option>
+              <option value="te">తెలుగు (Telugu)</option>
+              <option value="bn">বাংলা (Bengali)</option>
+              <option value="mr">मराठी (Marathi)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. Privacy Controls -->
+      <div class="settings-section-card" aria-label="Privacy controls">
+        <div class="settings-section-header">
+          <span class="settings-section-icon" aria-hidden="true">🔒</span>
+          <span class="settings-section-title">Privacy Controls</span>
+        </div>
+        <div class="settings-section-body">
+
+          <!-- Auto-delete retention -->
+          <div class="settings-slider-row">
+            <div class="settings-slider-label-row">
+              <div>
+                <div class="settings-row-label">Auto-Delete After</div>
+                <div class="settings-row-sublabel">Complaint data retention period</div>
+              </div>
+              <span class="settings-slider-value" id="settings-autodelete-value">30 days</span>
+            </div>
+            <input
+              type="range"
+              id="settings-autodelete-slider"
+              class="settings-range"
+              min="7"
+              max="365"
+              step="1"
+              value="30"
+              aria-label="Auto-delete retention period in days"
+              aria-valuemin="7"
+              aria-valuemax="365"
+              oninput="Settings.onAutoDeleteInput(this.value)"
+              onchange="Settings.savePrivacy()"
+            />
+            <div style="display:flex;justify-content:space-between;font-size:11px;color:#aaa;">
+              <span>7 days</span>
+              <span>365 days</span>
+            </div>
+          </div>
+
+          <!-- Theme -->
+          <div>
+            <div class="settings-row-label" style="margin-bottom:10px;">Theme</div>
+            <div class="settings-theme-group" role="group" aria-label="Theme selection">
+              <button
+                class="settings-theme-option"
+                id="settings-theme-light"
+                onclick="Settings.setTheme('light')"
+                aria-pressed="false"
+                aria-label="Light theme"
+              >
+                <span class="settings-theme-option-icon">☀️</span>
+                Light
+              </button>
+              <button
+                class="settings-theme-option"
+                id="settings-theme-dark"
+                onclick="Settings.setTheme('dark')"
+                aria-pressed="false"
+                aria-label="Dark theme"
+              >
+                <span class="settings-theme-option-icon">🌙</span>
+                Dark
+              </button>
+              <button
+                class="settings-theme-option"
+                id="settings-theme-system"
+                onclick="Settings.setTheme('system')"
+                aria-pressed="false"
+                aria-label="System theme"
+              >
+                <span class="settings-theme-option-icon">🖥️</span>
+                System
+              </button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- 3. Notification Preferences -->
+      <div class="settings-section-card" aria-label="Notification preferences">
+        <div class="settings-section-header">
+          <span class="settings-section-icon" aria-hidden="true">🔔</span>
+          <span class="settings-section-title">Notification Preferences</span>
+        </div>
+        <div class="settings-section-body">
+
+          <div class="settings-row">
+            <div>
+              <div class="settings-row-label">Complaint Status Updates</div>
+              <div class="settings-row-sublabel">Notified when your complaint status changes</div>
+            </div>
+            <label class="settings-toggle" aria-label="Toggle complaint status notifications">
+              <input
+                type="checkbox"
+                id="settings-notif-complaints"
+                onchange="Settings.saveNotifications()"
+                aria-label="Complaint status updates"
+              />
+              <span class="settings-toggle-slider"></span>
+            </label>
+          </div>
+
+          <div class="settings-row">
+            <div>
+              <div class="settings-row-label">Safety Alerts</div>
+              <div class="settings-row-sublabel">High-incident area alerts in your region</div>
+            </div>
+            <label class="settings-toggle" aria-label="Toggle safety alert notifications">
+              <input
+                type="checkbox"
+                id="settings-notif-safety"
+                onchange="Settings.saveNotifications()"
+                aria-label="Safety alerts"
+              />
+              <span class="settings-toggle-slider"></span>
+            </label>
+          </div>
+
+          <div class="settings-row">
+            <div>
+              <div class="settings-row-label">Awareness Reminders</div>
+              <div class="settings-row-sublabel">Weekly tips on safety and legal rights</div>
+            </div>
+            <label class="settings-toggle" aria-label="Toggle awareness reminder notifications">
+              <input
+                type="checkbox"
+                id="settings-notif-awareness"
+                onchange="Settings.saveNotifications()"
+                aria-label="Awareness reminders"
+              />
+              <span class="settings-toggle-slider"></span>
+            </label>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- 4. Emergency Contacts -->
+      <div class="settings-section-card" aria-label="Emergency contacts">
+        <div class="settings-section-header">
+          <span class="settings-section-icon" aria-hidden="true">📞</span>
+          <span class="settings-section-title">Emergency Contacts</span>
+        </div>
+        <div class="settings-section-body">
+
+          <div id="settings-contacts-list" aria-label="Saved emergency contacts" aria-live="polite">
+            <!-- Populated by Settings.renderContacts() -->
+          </div>
+
+          <!-- Inline add/edit form (hidden by default) -->
+          <div id="settings-contact-form" class="settings-contact-form" hidden aria-label="Contact form">
+            <div class="settings-contact-form-title" id="settings-contact-form-title">Add Contact</div>
+            <input
+              type="hidden"
+              id="settings-contact-edit-id"
+              value=""
+            />
+            <input
+              type="text"
+              id="settings-contact-name-input"
+              class="settings-input"
+              placeholder="Full name"
+              aria-label="Contact name"
+              autocomplete="name"
+              maxlength="60"
+            />
+            <input
+              type="tel"
+              id="settings-contact-phone-input"
+              class="settings-input"
+              placeholder="Phone number"
+              aria-label="Contact phone number"
+              autocomplete="tel"
+              maxlength="20"
+            />
+            <div class="settings-contact-form-actions">
+              <button class="settings-btn-secondary" onclick="Settings.cancelContactForm()" aria-label="Cancel">Cancel</button>
+              <button class="settings-btn-primary" onclick="Settings.saveContactForm()" aria-label="Save contact">Save</button>
+            </div>
+          </div>
+
+          <button
+            id="settings-add-contact-btn"
+            class="settings-add-contact-btn"
+            onclick="Settings.addContact()"
+            aria-label="Add emergency contact"
+          >
+            <span aria-hidden="true">＋</span> Add Contact
+          </button>
+
+        </div>
+      </div>
+
+      <!-- 5. Data Management -->
+      <div class="settings-section-card" aria-label="Data management">
+        <div class="settings-section-header">
+          <span class="settings-section-icon" aria-hidden="true">🗑️</span>
+          <span class="settings-section-title">Data Management</span>
+        </div>
+        <div class="settings-section-body">
+          <p style="font-size:14px;color:#888;line-height:1.5;margin:0;">
+            Permanently delete your account and all associated data. This action cannot be undone.
+          </p>
+          <button
+            class="settings-danger-btn"
+            onclick="Settings.deleteAccount()"
+            aria-label="Delete account and all data"
+          >
+            🗑️ Delete Account &amp; Data
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <section data-screen="sos" aria-label="SOS Active" aria-live="assertive">
+    <div class="sos-screen-inner">
+
+      <!-- Pulsing indicator -->
+      <div class="sos-pulse-ring" aria-hidden="true">
+        <div class="sos-icon-circle">🆘</div>
+      </div>
+
+      <!-- Heading -->
+      <h1 class="sos-heading" id="sos-heading">SOS Active</h1>
+      <p class="sos-status-text" id="sos-status-text">Alerting your emergency contacts&hellip;</p>
+
+      <!-- Contacts being notified -->
+      <div class="sos-contacts-card" id="sos-contacts-card" aria-label="Emergency contacts being notified">
+        <div class="sos-contacts-title">Notifying</div>
+        <div id="sos-contacts-list">
+          <!-- populated by SOS.onScreenEnter() -->
+        </div>
+      </div>
+
+      <!-- Action buttons -->
+      <div class="sos-actions">
+        <a
+          id="sos-helpline-link"
+          class="sos-helpline-btn"
+          href="tel:112"
+          aria-label="Call emergency helpline"
+          role="button"
+        >
+          📞 Call Helpline
+        </a>
+
+        <button
+          class="sos-cancel-btn"
+          onclick="SOS.cancel()"
+          aria-label="Cancel SOS"
+        >
+          ✕ Cancel SOS
+        </button>
+      </div>
+
+    </div>
+  </section>
+
+  <section data-screen="quickexit">
+    <!-- Quick Exit — handled by #quickexit-screen overlay -->
+  </section>
+
+  <script>
+    // ── Store: localStorage adapter ──────────────────────────────────────────
+
+    const Store = {
+      save(key, value) {
+        try {
+          localStorage.setItem(key, JSON.stringify(value));
+        } catch (e) {
+          Toast.show('Storage full — please clear old data in Settings');
+        }
+      },
+      load(key, fallback = null) {
+        try {
+          const raw = localStorage.getItem(key);
+          return raw !== null ? JSON.parse(raw) : fallback;
+        } catch (e) {
+          return fallback;
+        }
+      }
+    };
+
+    // ── AppState: in-memory runtime state ────────────────────────────────────
+
+    const AppState = {
+      currentUser: { mode: 'anonymous' },
+      theme: 'light',
+      language: 'en',
+      emergencyContacts: [],
+      offlineReports: [],
+      complaints: [],
+      settings: {
+        theme: 'system',
+        language: 'en',
+        notificationsEnabled: { complaints: true, safety: true, awareness: true },
+        autoDeleteDays: 30,
+        emergencyHelpline: '112'
+      },
+      chat: { messages: [], botActive: true },
+      sosActive: false,
+      sosIntervalId: null
+    };
+
+    // ── Router ───────────────────────────────────────────────────────────────
+
+    const Router = {
+      _history: [],
+      _params: {},
+
+      navigate(screenName, params = {}) {
+        // Hide all screens
+        document.querySelectorAll('[data-screen]').forEach(s => s.classList.remove('active'));
+
+        // Show target screen
+        const target = document.querySelector(`[data-screen="${screenName}"]`);
+        if (target) {
+          target.classList.add('active');
+        }
+
+        // Store params and push history
+        Router._params = params;
+        Router._history.push({ screen: screenName, params });
+
+        // Push browser history entry
+        if (typeof history !== 'undefined' && history.pushState) {
+          history.pushState({ screen: screenName, params }, '', `#${screenName}`);
+        }
+
+        // Toggle shared UI visibility
+        const hideShared = screenName === 'quickexit' || screenName === 'onboarding';
+        const navbar = document.getElementById('navbar');
+        const sosBtn = document.getElementById('sos-button');
+        const exitBtn = document.getElementById('quickexit-button');
+        if (navbar) navbar.style.display = hideShared ? 'none' : '';
+        if (sosBtn) sosBtn.style.display = hideShared ? 'none' : '';
+        if (exitBtn) exitBtn.style.display = screenName === 'quickexit' ? 'none' : '';
+
+        // Highlight active tab
+        document.querySelectorAll('#navbar button[data-tab]').forEach(btn => {
+          btn.classList.toggle('active-tab', btn.dataset.tab === screenName);
+        });
+
+        // Screen-specific init hooks
+        if (screenName === 'onboarding') {
+          Onboarding.init();
+        }
+        if (screenName === 'auth') {
+          Auth.showMethods();
+        }
+        if (screenName === 'dashboard') {
+          Dashboard.updateThemeIcon();
+        }
+        if (screenName === 'report') {
+          Report.init();
+        }
+        if (screenName === 'track') {
+          Track.init();
+        }
+        if (screenName === 'map') {
+          HelpMap.init();
+        }
+        if (screenName === 'chat') {
+          Chat.init();
+        }
+        if (screenName === 'awareness') {
+          Awareness.init();
+        }
+        if (screenName === 'article') {
+          Awareness.renderArticle();
+        }
+        if (screenName === 'settings') {
+          Settings.init();
+        }
+        if (screenName === 'sos') {
+          // onScreenEnter is called by SOS.activate() after navigate;
+          // guard here handles any direct navigate('sos') calls
+          if (AppState.sosActive) {
+            SOS.onScreenEnter();
+          }
+        }
+      },
+
+      getParams() {
+        return Router._params;
+      },
+
+      back() {
+        Router._history.pop();
+        const prev = Router._history[Router._history.length - 1];
+        if (prev) {
+          Router.navigate(prev.screen, prev.params);
+        }
+      }
+    };
+
+    // ── Toast ────────────────────────────────────────────────────────────────
+
+    const Toast = {
+      _timer: null,
+      show(message, duration = 3000) {
+        const el = document.getElementById('toast');
+        if (!el) return;
+        el.textContent = message;
+        el.classList.add('show');
+        if (Toast._timer) clearTimeout(Toast._timer);
+        Toast._timer = setTimeout(() => el.classList.remove('show'), duration);
+      }
+    };
+
+    // ── Modal ────────────────────────────────────────────────────────────────
+
+    const Modal = {
+      show(message, onConfirm) {
+        const overlay = document.getElementById('modal-overlay');
+        const msg = document.getElementById('modal-message');
+        const confirmBtn = document.getElementById('modal-confirm');
+        if (!overlay || !msg || !confirmBtn) return;
+        msg.textContent = message;
+        overlay.classList.add('show');
+        confirmBtn.onclick = () => {
+          Modal.hide();
+          if (typeof onConfirm === 'function') onConfirm();
+        };
+      },
+      hide() {
+        const overlay = document.getElementById('modal-overlay');
+        if (overlay) overlay.classList.remove('show');
+      }
+    };
+
+    // ── Theme ────────────────────────────────────────────────────────────────
+
+    const Theme = {
+      apply(theme) {
+        const resolved = theme === 'system'
+          ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+          : theme;
+        document.documentElement.setAttribute('data-theme', resolved);
+        AppState.theme = resolved;
+        Store.save('sv_theme', theme);
+      },
+      toggle() {
+        const next = AppState.theme === 'dark' ? 'light' : 'dark';
+        Theme.apply(next);
+      },
+      init() {
+        const saved = Store.load('sv_theme', 'system');
+        Theme.apply(saved);
+      }
+    };
+
+    // ── Utility: generateComplaintId ─────────────────────────────────────────
+
+    function generateComplaintId() {
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+      const rand = Array.from({ length: 6 }, () =>
+        chars[Math.floor(Math.random() * chars.length)]
+      ).join('');
+      return `SV-${rand}`;
+    }
+
+    // ── SOS ──────────────────────────────────────────────────────────────────
+
+    const SOS = {
+      activate() {
+        const contacts = AppState.emergencyContacts;
+        if (!contacts || contacts.length === 0) {
+          Toast.show('Add emergency contacts in Settings');
+          return;
+        }
+        Router.navigate('sos');
+        SOS.onScreenEnter();
+      },
+
+      onScreenEnter() {
+        const contacts = AppState.emergencyContacts;
+        if (!contacts || contacts.length === 0) return;
+
+        // Render contact list
+        const listEl = document.getElementById('sos-contacts-list');
+        if (listEl) {
+          listEl.innerHTML = contacts.map(c => `
+            <div class="sos-contact-item">
+              <span class="sos-contact-icon" aria-hidden="true">👤</span>
+              <span class="sos-contact-name">${c.name || 'Contact'}</span>
+              <span class="sos-contact-phone">${c.phone || ''}</span>
+            </div>`).join('');
+        }
+
+        // Update helpline link
+        const helpline = (AppState.settings && AppState.settings.emergencyHelpline) || '112';
+        const helplineLink = document.getElementById('sos-helpline-link');
+        if (helplineLink) {
+          helplineLink.href = `tel:${helpline}`;
+          helplineLink.textContent = '';
+          helplineLink.innerHTML = `📞 Call Helpline (${helpline})`;
+        }
+
+        // Simulate SMS to contacts
+        const names = contacts.map(c => c.name || c.phone).join(', ');
+        alert(`[Simulated] SOS activated — sending location to ${names}`);
+
+        // Mark SOS as active
+        AppState.sosActive = true;
+
+        // Clear any existing interval
+        if (AppState.sosIntervalId !== null) {
+          clearInterval(AppState.sosIntervalId);
+          AppState.sosIntervalId = null;
+        }
+
+        // Start 60-second location update interval
+        AppState.sosIntervalId = setInterval(() => {
+          alert('[Simulated] Location update sent to emergency contacts');
+        }, 60000);
+      },
+
+      cancel() {
+        if (AppState.sosIntervalId !== null) {
+          clearInterval(AppState.sosIntervalId);
+          AppState.sosIntervalId = null;
+        }
+        AppState.sosActive = false;
+        Router.navigate('dashboard');
+      }
+    };
+
+    // ── QuickExit ─────────────────────────────────────────────────────────────
+
+    const QuickExit = {
+      activate() {
+        if (AppState.sosActive && AppState.sosIntervalId !== null) {
+          clearInterval(AppState.sosIntervalId);
+          AppState.sosIntervalId = null;
+          AppState.sosActive = false;
+        }
+        document.querySelectorAll('[data-screen]').forEach(s => s.classList.remove('active'));
+        const navbar = document.getElementById('navbar');
+        const sosBtn = document.getElementById('sos-button');
+        const exitBtn = document.getElementById('quickexit-button');
+        if (navbar) navbar.style.display = 'none';
+        if (sosBtn) sosBtn.style.display = 'none';
+        if (exitBtn) exitBtn.style.display = 'none';
+        const qeScreen = document.getElementById('quickexit-screen');
+        if (qeScreen) qeScreen.classList.add('show');
+      },
+      restore() {
+        const qeScreen = document.getElementById('quickexit-screen');
+        if (qeScreen) qeScreen.classList.remove('show');
+        Router.navigate('dashboard');
+      }
+    };
+
+    // ── Calculator (Quick Exit disguise) ─────────────────────────────────────
+
+    let _calcExpr = '';
+    let _calcEqPressStart = null;
+
+    function calcInput(val) {
+      _calcExpr += val;
+      document.getElementById('calc-display').textContent = _calcExpr;
+    }
+
+    function calcEquals() {
+      try {
+        // eslint-disable-next-line no-new-func
+        const result = Function('"use strict"; return (' + _calcExpr + ')')();
+        document.getElementById('calc-display').textContent = result;
+        _calcExpr = String(result);
+      } catch {
+        document.getElementById('calc-display').textContent = 'Error';
+        _calcExpr = '';
+      }
+    }
+
+    function calcClear() {
+      _calcExpr = '';
+      document.getElementById('calc-display').textContent = '0';
+    }
+
+    // Long-press "=" for 3 s to restore app
+    (function setupCalcLongPress() {
+      const eqBtn = document.getElementById('calc-equals');
+      if (!eqBtn) return;
+      eqBtn.addEventListener('mousedown', () => { _calcEqPressStart = Date.now(); });
+      eqBtn.addEventListener('touchstart', () => { _calcEqPressStart = Date.now(); }, { passive: true });
+      const release = () => {
+        if (_calcEqPressStart && Date.now() - _calcEqPressStart >= 3000) {
+          QuickExit.restore();
+        }
+        _calcEqPressStart = null;
+      };
+      eqBtn.addEventListener('mouseup', release);
+      eqBtn.addEventListener('touchend', release);
+    })();
+
+    // ── Onboarding ───────────────────────────────────────────────────────────
+
+    const Onboarding = {
+      _current: 0,
+      _total: 3,
+      _touchStartX: 0,
+      _touchStartY: 0,
+
+      init() {
+        Onboarding._current = 0;
+        Onboarding._render();
+
+        // Touch swipe support
+        const wrapper = document.getElementById('onboarding-slides-wrapper');
+        if (!wrapper) return;
+        wrapper.addEventListener('touchstart', (e) => {
+          Onboarding._touchStartX = e.changedTouches[0].clientX;
+          Onboarding._touchStartY = e.changedTouches[0].clientY;
+        }, { passive: true });
+        wrapper.addEventListener('touchend', (e) => {
+          const dx = e.changedTouches[0].clientX - Onboarding._touchStartX;
+          const dy = e.changedTouches[0].clientY - Onboarding._touchStartY;
+          // Only treat as horizontal swipe if horizontal movement dominates
+          if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 40) {
+            if (dx < 0) {
+              Onboarding.next();
+            } else {
+              Onboarding.prev();
+            }
+          }
+        }, { passive: true });
+      },
+
+      _render() {
+        const track = document.getElementById('onboarding-slides-track');
+        if (track) {
+          track.style.transform = `translateX(-${Onboarding._current * 100}%)`;
+        }
+
+        // Update dots
+        const dots = document.querySelectorAll('#onboarding-dots .onboarding-dot');
+        dots.forEach((dot, i) => {
+          dot.classList.toggle('active', i === Onboarding._current);
+          dot.setAttribute('aria-selected', i === Onboarding._current ? 'true' : 'false');
+        });
+
+        // Update button label
+        const btn = document.getElementById('onboarding-next-btn');
+        if (btn) {
+          const isLast = Onboarding._current === Onboarding._total - 1;
+          btn.textContent = isLast ? 'Get Started' : 'Next';
+          btn.setAttribute('aria-label', isLast ? 'Get started' : 'Next slide');
+        }
+      },
+
+      next() {
+        if (Onboarding._current < Onboarding._total - 1) {
+          Onboarding._current++;
+          Onboarding._render();
+        } else {
+          Onboarding.finish();
+        }
+      },
+
+      prev() {
+        if (Onboarding._current > 0) {
+          Onboarding._current--;
+          Onboarding._render();
+        }
+      },
+
+      finish() {
+        Store.save('sv_onboarded', true);
+        Router.navigate('auth');
+      }
+    };
+
+    // ── Auth ─────────────────────────────────────────────────────────────────
+
+    const Auth = {
+      _otpTimerId: null,
+      _otpSecondsLeft: 0,
+      _phone: '',
+
+      showMethods() {
+        Auth._clearOTPTimer();
+        document.getElementById('auth-methods').hidden = false;
+        document.getElementById('auth-email-form').hidden = true;
+        document.getElementById('auth-phone-form').hidden = true;
+        document.getElementById('auth-otp-form').hidden = true;
+      },
+
+      chooseAnonymous() {
+        AppState.currentUser = { mode: 'anonymous' };
+        Router.navigate('dashboard');
+      },
+
+      chooseEmail() {
+        document.getElementById('auth-methods').hidden = true;
+        document.getElementById('auth-email-form').hidden = false;
+        document.getElementById('auth-email-input').value = '';
+        document.getElementById('auth-email-error').hidden = true;
+        document.getElementById('auth-email-input').focus();
+      },
+
+      choosePhone() {
+        document.getElementById('auth-methods').hidden = true;
+        document.getElementById('auth-phone-form').hidden = false;
+        document.getElementById('auth-phone-input').value = '';
+        document.getElementById('auth-phone-error').hidden = true;
+        document.getElementById('auth-phone-input').focus();
+      },
+
+      showPhone() {
+        Auth._clearOTPTimer();
+        document.getElementById('auth-otp-form').hidden = true;
+        document.getElementById('auth-phone-form').hidden = false;
+      },
+
+      submitEmail() {
+        const input = document.getElementById('auth-email-input');
+        const errEl = document.getElementById('auth-email-error');
+        const email = input.value.trim();
+        if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+          errEl.textContent = 'Please enter a valid email address.';
+          errEl.hidden = false;
+          input.focus();
+          return;
+        }
+        errEl.hidden = true;
+        AppState.currentUser = { mode: 'authenticated', email };
+        Router.navigate('dashboard');
+      },
+
+      sendOTP() {
+        const input = document.getElementById('auth-phone-input');
+        const errEl = document.getElementById('auth-phone-error');
+        const phone = input.value.trim();
+        if (!phone || phone.length < 7) {
+          errEl.textContent = 'Please enter a valid phone number.';
+          errEl.hidden = false;
+          input.focus();
+          return;
+        }
+        errEl.hidden = true;
+        Auth._phone = phone;
+
+        // Simulate OTP delivery
+        alert(`[Simulated] OTP sent to ${phone}. Use any 6-digit code to verify.`);
+
+        // Show OTP form
+        document.getElementById('auth-phone-form').hidden = true;
+        document.getElementById('auth-otp-form').hidden = false;
+        document.getElementById('auth-otp-phone-display').textContent = phone;
+        document.getElementById('auth-otp-input').value = '';
+        document.getElementById('auth-otp-error').hidden = true;
+
+        // Enable OTP input and verify button, hide resend button
+        const otpInput = document.getElementById('auth-otp-input');
+        const verifyBtn = document.getElementById('auth-verify-otp-btn');
+        const resendBtn = document.getElementById('auth-resend-btn');
+        otpInput.disabled = false;
+        verifyBtn.disabled = false;
+        resendBtn.hidden = true;
+
+        // Start 5-minute countdown
+        Auth._startOTPTimer(300);
+        otpInput.focus();
+      },
+
+      _startOTPTimer(seconds) {
+        Auth._clearOTPTimer();
+        Auth._otpSecondsLeft = seconds;
+        Auth._renderCountdown();
+        Auth._otpTimerId = setInterval(() => {
+          Auth._otpSecondsLeft--;
+          Auth._renderCountdown();
+          if (Auth._otpSecondsLeft <= 0) {
+            Auth._clearOTPTimer();
+            Auth._onOTPExpired();
+          }
+        }, 1000);
+      },
+
+      _clearOTPTimer() {
+        if (Auth._otpTimerId !== null) {
+          clearInterval(Auth._otpTimerId);
+          Auth._otpTimerId = null;
+        }
+      },
+
+      _renderCountdown() {
+        const el = document.getElementById('auth-otp-countdown');
+        if (!el) return;
+        const m = Math.floor(Auth._otpSecondsLeft / 60);
+        const s = Auth._otpSecondsLeft % 60;
+        el.textContent = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+        el.classList.toggle('expired', Auth._otpSecondsLeft <= 0);
+      },
+
+      _onOTPExpired() {
+        const otpInput = document.getElementById('auth-otp-input');
+        const verifyBtn = document.getElementById('auth-verify-otp-btn');
+        const resendBtn = document.getElementById('auth-resend-btn');
+        const errEl = document.getElementById('auth-otp-error');
+        if (otpInput) otpInput.disabled = true;
+        if (verifyBtn) verifyBtn.disabled = true;
+        if (resendBtn) resendBtn.hidden = false;
+        if (errEl) {
+          errEl.textContent = 'OTP expired. Please request a new one.';
+          errEl.hidden = false;
+        }
+      },
+
+      verifyOTP() {
+        const otpInput = document.getElementById('auth-otp-input');
+        const errEl = document.getElementById('auth-otp-error');
+        const code = otpInput.value.trim();
+        if (!/^\d{6}$/.test(code)) {
+          errEl.textContent = 'Please enter a valid 6-digit code.';
+          errEl.hidden = false;
+          otpInput.focus();
+          return;
+        }
+        errEl.hidden = true;
+        Auth._clearOTPTimer();
+        AppState.currentUser = { mode: 'authenticated', phone: Auth._phone };
+        Router.navigate('dashboard');
+      },
+
+      resendOTP() {
+        Auth.sendOTP();
+      }
+    };
+
+    // ── Dashboard ────────────────────────────────────────────────────────────
+
+    const Dashboard = {
+      updateThemeIcon() {
+        const btn = document.getElementById('dashboard-theme-btn');
+        if (!btn) return;
+        btn.textContent = AppState.theme === 'dark' ? '☀️' : '🌙';
+        btn.setAttribute('aria-label', AppState.theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode');
+      },
+
+      init() {
+        Dashboard.updateThemeIcon();
+      }
+    };
+
+    // ── Report ───────────────────────────────────────────────────────────────
+
+    const Report = {
+      _recognition: null,
+      _listening: false,
+
+      init() {
+        // Default datetime to now
+        const dtInput = document.getElementById('report-datetime');
+        if (dtInput) {
+          const now = new Date();
+          // datetime-local format: YYYY-MM-DDTHH:MM
+          const pad = n => String(n).padStart(2, '0');
+          const local = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+          dtInput.value = local;
+        }
+
+        // Set up Web Speech API
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const micBtn = document.getElementById('report-mic-btn');
+        if (!SpeechRecognition) {
+          if (micBtn) micBtn.style.display = 'none';
+        } else {
+          Report._recognition = new SpeechRecognition();
+          Report._recognition.continuous = false;
+          Report._recognition.interimResults = false;
+          Report._recognition.lang = 'en-US';
+
+          Report._recognition.onresult = (e) => {
+            const transcript = Array.from(e.results)
+              .map(r => r[0].transcript)
+              .join(' ');
+            const textarea = document.getElementById('report-description');
+            if (textarea) {
+              textarea.value = (textarea.value ? textarea.value + ' ' : '') + transcript;
+            }
+            Report._setListening(false);
+          };
+
+          Report._recognition.onerror = () => Report._setListening(false);
+          Report._recognition.onend = () => Report._setListening(false);
+        }
+
+        // Clear form fields
+        const form = document.getElementById('report-form');
+        if (form) form.reset();
+        // Re-apply default datetime after reset
+        if (dtInput) {
+          const now = new Date();
+          const pad = n => String(n).padStart(2, '0');
+          const local = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+          dtInput.value = local;
+        }
+        // Clear file label
+        const labelText = document.getElementById('report-evidence-label-text');
+        if (labelText) labelText.textContent = 'Attach images, audio, or video';
+        const namesEl = document.getElementById('report-evidence-names');
+        if (namesEl) namesEl.textContent = '';
+        // Hide all errors
+        ['report-type-error', 'report-description-error', 'report-evidence-error'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) { el.textContent = ''; el.classList.remove('visible'); }
+        });
+      },
+
+      toggleMic() {
+        if (!Report._recognition) return;
+        if (Report._listening) {
+          Report._recognition.stop();
+          Report._setListening(false);
+        } else {
+          try {
+            Report._recognition.start();
+            Report._setListening(true);
+          } catch (e) {
+            Report._setListening(false);
+          }
+        }
+      },
+
+      _setListening(active) {
+        Report._listening = active;
+        const btn = document.getElementById('report-mic-btn');
+        if (!btn) return;
+        btn.classList.toggle('listening', active);
+        btn.setAttribute('aria-label', active ? 'Stop voice input' : 'Start voice input');
+        btn.title = active ? 'Stop recording' : 'Voice to text';
+      },
+
+      detectLocation() {
+        const input = document.getElementById('report-location');
+        const btn = document.getElementById('report-gps-btn');
+        if (!navigator.geolocation) {
+          Toast.show('Geolocation is not supported on this device.');
+          return;
+        }
+        if (btn) { btn.textContent = '⏳'; btn.disabled = true; }
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            if (input) {
+              input.value = `${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`;
+            }
+            if (btn) { btn.textContent = '📍'; btn.disabled = false; }
+          },
+          () => {
+            Toast.show('Could not detect location. Please enter it manually.');
+            if (btn) { btn.textContent = '📍'; btn.disabled = false; }
+          },
+          { timeout: 10000 }
+        );
+      },
+
+      onFilesChange() {
+        const input = document.getElementById('report-evidence');
+        const namesEl = document.getElementById('report-evidence-names');
+        const labelText = document.getElementById('report-evidence-label-text');
+        const errEl = document.getElementById('report-evidence-error');
+        if (!input) return;
+        const files = Array.from(input.files);
+        if (files.length === 0) {
+          if (labelText) labelText.textContent = 'Attach images, audio, or video';
+          if (namesEl) namesEl.textContent = '';
+          return;
+        }
+        if (labelText) labelText.textContent = `${files.length} file${files.length > 1 ? 's' : ''} selected`;
+        if (namesEl) namesEl.textContent = files.map(f => f.name).join(', ');
+        // Clear file size error on new selection
+        if (errEl) { errEl.textContent = ''; errEl.classList.remove('visible'); }
+      },
+
+      _showError(id, message) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.textContent = message;
+        el.classList.add('visible');
+      },
+
+      _clearError(id) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.textContent = '';
+        el.classList.remove('visible');
+      },
+
+      _validate() {
+        let valid = true;
+
+        const type = (document.getElementById('report-type') || {}).value || '';
+        if (!type) {
+          Report._showError('report-type-error', 'Please select a harassment type.');
+          valid = false;
+        } else {
+          Report._clearError('report-type-error');
+        }
+
+        const desc = ((document.getElementById('report-description') || {}).value || '').trim();
+        if (!desc) {
+          Report._showError('report-description-error', 'Please enter a description.');
+          valid = false;
+        } else {
+          Report._clearError('report-description-error');
+        }
+
+        const input = document.getElementById('report-evidence');
+        if (input && input.files.length > 0) {
+          const totalBytes = Array.from(input.files).reduce((sum, f) => sum + f.size, 0);
+          const maxBytes = 50 * 1024 * 1024; // 50 MB
+          if (totalBytes > maxBytes) {
+            Report._showError('report-evidence-error', 'Combined file size exceeds 50 MB. Please remove some files.');
+            valid = false;
+          } else {
+            Report._clearError('report-evidence-error');
+          }
+        }
+
+        return valid;
+      },
+
+      submit(event) {
+        if (event) event.preventDefault();
+        if (!Report._validate()) return;
+
+        const type = document.getElementById('report-type').value;
+        const description = document.getElementById('report-description').value.trim();
+        const location = (document.getElementById('report-location').value || '').trim();
+        const dateTimeEl = document.getElementById('report-datetime');
+        const dateTime = dateTimeEl ? dateTimeEl.value : new Date().toISOString();
+        const evidenceInput = document.getElementById('report-evidence');
+        const evidenceNames = evidenceInput ? Array.from(evidenceInput.files).map(f => f.name) : [];
+
+        const now = new Date().toISOString();
+        const complaintId = generateComplaintId();
+        const isOnline = navigator.onLine;
+
+        const complaint = {
+          complaintId,
+          type,
+          description,
+          location,
+          dateTime,
+          evidenceNames,
+          status: 'Submitted',
+          statusHistory: [{ status: 'Submitted', timestamp: now }],
+          anonymous: AppState.currentUser.mode === 'anonymous',
+          offline: !isOnline,
+          createdAt: now
+        };
+
+        if (isOnline) {
+          // Save to complaints store
+          const complaints = Store.load('sv_complaints', []);
+          complaints.push(complaint);
+          Store.save('sv_complaints', complaints);
+          AppState.complaints = complaints;
+
+          // Navigate to confirmation screen
+          Router.navigate('report-confirm');
+          const idEl = document.getElementById('confirm-complaint-id');
+          if (idEl) idEl.textContent = complaintId;
+        } else {
+          // Save as offline report
+          AppState.offlineReports.push(complaint);
+          Store.save('sv_offline_reports', AppState.offlineReports);
+          Toast.show('Saved offline — will submit when connected.');
+          Router.navigate('dashboard');
+        }
+      }
+    };
+
+    // ── Track ────────────────────────────────────────────────────────────────
+
+    const Track = {
+      init() {
+        const input = document.getElementById('track-id-input');
+        if (input) input.value = '';
+        const result = document.getElementById('track-result');
+        if (result) result.innerHTML = '';
+      },
+
+      lookup() {
+        const input = document.getElementById('track-id-input');
+        const result = document.getElementById('track-result');
+        if (!input || !result) return;
+
+        const enteredId = input.value.trim().toUpperCase();
+        if (!enteredId) {
+          result.innerHTML = Track._errorCard('Please enter a Complaint ID.');
+          return;
+        }
+
+        const complaints = Store.load('sv_complaints', []);
+        const complaint = complaints.find(c => c.complaintId === enteredId);
+
+        if (!complaint) {
+          result.innerHTML = Track._errorCard('No complaint found with this ID.');
+          return;
+        }
+
+        result.innerHTML = Track._statusCard(complaint);
+      },
+
+      _statusBadge(status) {
+        const map = {
+          'Submitted':    { bg: 'var(--color-primary)',   color: '#fff' },
+          'Under Review': { bg: '#F4A261',                color: '#fff' },
+          'Action Taken': { bg: 'var(--color-success)',   color: '#fff' }
+        };
+        const style = map[status] || { bg: '#ccc', color: '#333' };
+        return `<span style="display:inline-block;background:${style.bg};color:${style.color};border-radius:20px;padding:4px 16px;font-size:14px;font-weight:700;letter-spacing:0.3px;">${status}</span>`;
+      },
+
+      _timelineItem(entry, isLast) {
+        const date = new Date(entry.timestamp);
+        const formatted = isNaN(date.getTime())
+          ? entry.timestamp
+          : date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+        const dotColor = isLast ? 'var(--color-secondary)' : '#ccc';
+        return `
+          <div style="display:flex;gap:12px;align-items:flex-start;">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:0;">
+              <div style="width:12px;height:12px;border-radius:50%;background:${dotColor};flex-shrink:0;margin-top:3px;"></div>
+              ${!isLast ? '<div style="width:2px;flex:1;background:#e0d8f0;min-height:24px;"></div>' : ''}
+            </div>
+            <div style="padding-bottom:${isLast ? '0' : '12px'};">
+              <div style="font-size:14px;font-weight:600;color:var(--color-text);">${entry.status}</div>
+              <div style="font-size:12px;color:#888;margin-top:2px;">${formatted}</div>
+            </div>
+          </div>`;
+      },
+
+      _statusCard(complaint) {
+        const history = Array.isArray(complaint.statusHistory) ? complaint.statusHistory : [];
+        const timelineHtml = history.map((entry, i) =>
+          Track._timelineItem(entry, i === history.length - 1)
+        ).join('');
+
+        return `
+          <div class="card" style="margin-top:4px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:16px;">
+              <div>
+                <div style="font-size:12px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:0.5px;">Complaint ID</div>
+                <div style="font-size:20px;font-weight:800;color:var(--color-primary);letter-spacing:2px;font-variant-numeric:tabular-nums;">${complaint.complaintId}</div>
+              </div>
+              ${Track._statusBadge(complaint.status)}
+            </div>
+            <div style="margin-bottom:12px;">
+              <div style="font-size:12px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">Type</div>
+              <div style="font-size:15px;color:var(--color-text);">${complaint.type || '—'}</div>
+            </div>
+            ${history.length > 0 ? `
+            <div>
+              <div style="font-size:12px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;">Status Timeline</div>
+              <div>${timelineHtml}</div>
+            </div>` : ''}
+          </div>`;
+      },
+
+      _errorCard(message) {
+        return `
+          <div class="card" style="margin-top:4px;display:flex;align-items:center;gap:12px;border-left:4px solid var(--color-danger);">
+            <span style="font-size:24px;" aria-hidden="true">❌</span>
+            <p style="font-size:15px;color:var(--color-danger);margin:0;">${message}</p>
+          </div>`;
+      }
+    };
+
+    // ── HelpMap ──────────────────────────────────────────────────────────────
+
+    const HelpMap = {
+      _heatmapActive: false,
+
+      init() {
+        // Reset heatmap state when screen is entered
+        HelpMap._heatmapActive = false;
+        const container = document.getElementById('map-container');
+        const btn = document.getElementById('map-heatmap-btn');
+        const legend = document.getElementById('map-legend');
+        if (container) container.classList.remove('heatmap-active');
+        if (btn) {
+          btn.classList.remove('active');
+          btn.setAttribute('aria-pressed', 'false');
+        }
+        if (legend) {
+          legend.classList.remove('visible');
+          legend.setAttribute('aria-hidden', 'true');
+        }
+      },
+
+      toggleHeatmap() {
+        HelpMap._heatmapActive = !HelpMap._heatmapActive;
+        const container = document.getElementById('map-container');
+        const btn = document.getElementById('map-heatmap-btn');
+        const legend = document.getElementById('map-legend');
+        if (container) container.classList.toggle('heatmap-active', HelpMap._heatmapActive);
+        if (btn) {
+          btn.classList.toggle('active', HelpMap._heatmapActive);
+          btn.setAttribute('aria-pressed', HelpMap._heatmapActive ? 'true' : 'false');
+        }
+        if (legend) {
+          legend.classList.toggle('visible', HelpMap._heatmapActive);
+          legend.setAttribute('aria-hidden', HelpMap._heatmapActive ? 'false' : 'true');
+        }
+      }
+    };
+
+    // ── Chat ─────────────────────────────────────────────────────────────────
+
+    const Chat = {
+      _botResponses: {
+        legal:   "I can help with legal information. You have the right to file a complaint with the police. Would you like guidance on the process?",
+        unsafe:  "Your safety is the priority. If you're in immediate danger, please use the SOS button. I'm here with you.",
+        report:  "I can guide you through filing a report. Tap 'Submit Report' on the dashboard, or I can walk you through it step by step.",
+        help:    "I'm here to help. You can report an incident, find nearby resources, or just talk. What do you need?",
+        default: "I understand. You're not alone. Can you tell me more about what happened?"
+      },
+
+      _getBotResponse(text) {
+        const t = text.toLowerCase();
+        if (t.includes('legal'))                                    return Chat._botResponses.legal;
+        if (t.includes('unsafe') || t.includes('danger') || t.includes('scared')) return Chat._botResponses.unsafe;
+        if (t.includes('report') || t.includes('file'))            return Chat._botResponses.report;
+        if (t.includes('help'))                                     return Chat._botResponses.help;
+        return Chat._botResponses.default;
+      },
+
+      _formatTime(isoString) {
+        const d = new Date(isoString);
+        return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+      },
+
+      _renderMessages() {
+        const container = document.getElementById('chat-messages');
+        if (!container) return;
+        container.innerHTML = AppState.chat.messages.map(msg => {
+          const isUser = msg.sender === 'user';
+          return `
+            <div class="chat-bubble-row ${isUser ? 'user' : 'bot'}">
+              ${!isUser ? '<div class="chat-avatar" aria-hidden="true">🤖</div>' : ''}
+              <div>
+                <div class="chat-bubble ${isUser ? 'user' : 'bot'}">${Chat._escapeHtml(msg.text)}</div>
+                <div class="chat-bubble-time">${Chat._formatTime(msg.timestamp)}</div>
+              </div>
+            </div>`;
+        }).join('');
+        container.scrollTop = container.scrollHeight;
+      },
+
+      _escapeHtml(str) {
+        return str
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      },
+
+      _addMessage(sender, text) {
+        const msg = {
+          id: Date.now() + '_' + Math.random().toString(36).slice(2),
+          sender,
+          text,
+          timestamp: new Date().toISOString()
+        };
+        AppState.chat.messages.push(msg);
+        Chat._renderMessages();
+        return msg;
+      },
+
+      _showTyping() {
+        const container = document.getElementById('chat-messages');
+        if (!container) return;
+        const el = document.createElement('div');
+        el.id = 'chat-typing';
+        el.className = 'chat-bubble-row bot';
+        el.setAttribute('aria-label', 'Bot is typing');
+        el.innerHTML = `
+          <div class="chat-avatar" aria-hidden="true">🤖</div>
+          <div class="chat-typing-dots" aria-hidden="true">
+            <span></span><span></span><span></span>
+          </div>`;
+        container.appendChild(el);
+        container.scrollTop = container.scrollHeight;
+      },
+
+      _hideTyping() {
+        const el = document.getElementById('chat-typing');
+        if (el) el.remove();
+      },
+
+      _botReply(userText) {
+        const delay = 1000 + Math.random() * 1000; // 1–2 s
+        Chat._showTyping();
+        setTimeout(() => {
+          Chat._hideTyping();
+          const response = Chat._getBotResponse(userText);
+          Chat._addMessage('bot', response);
+        }, delay);
+      },
+
+      sendMessage(text) {
+        const inputEl = document.getElementById('chat-input');
+        const msg = (text !== undefined ? text : (inputEl ? inputEl.value : '')).trim();
+        if (!msg) return;
+
+        // Clear input
+        if (inputEl && text === undefined) inputEl.value = '';
+
+        // Add user message
+        Chat._addMessage('user', msg);
+
+        // Bot reply with delay
+        Chat._botReply(msg);
+      },
+
+      endSession() {
+        // Clear messages from AppState (not stored in localStorage for anonymous users)
+        AppState.chat.messages = [];
+        // Per Req 6.6: if anonymous, ensure no chat data lingers in localStorage
+        if (AppState.currentUser && AppState.currentUser.mode === 'anonymous') {
+          Store.save('sv_chat_messages', null);
+        }
+      },
+
+      init() {
+        // Reset messages for new session
+        AppState.chat.messages = [];
+        AppState.chat.botActive = true;
+
+        // Render empty list
+        Chat._renderMessages();
+
+        // Show welcome message from bot
+        setTimeout(() => {
+          Chat._addMessage('bot', "Hi, I'm here for you. You're safe here. How can I help you today?");
+        }, 300);
+
+        // Show quick options
+        const quickOpts = document.getElementById('chat-quick-options');
+        if (quickOpts) quickOpts.style.display = '';
+
+        // Show AI badge
+        const badge = document.getElementById('chat-ai-badge');
+        if (badge) badge.style.display = '';
+
+        // Focus input
+        const inputEl = document.getElementById('chat-input');
+        if (inputEl) inputEl.focus();
+      }
+    };
+
+    // ── Awareness ────────────────────────────────────────────────────────────
+
+    const AWARENESS_ARTICLES = [
+      {
+        id: 'legal-1',
+        category: 'legal',
+        categoryLabel: 'Legal Rights',
+        icon: '⚖️',
+        title: 'Know Your Rights: Filing a Police Complaint',
+        description: 'Learn the step-by-step process for filing an FIR and what protections the law provides to complainants.',
+        content: [
+          'Filing a First Information Report (FIR) is your legal right. Under Section 154 of the Code of Criminal Procedure, any police officer is obligated to register your complaint. If the officer refuses, you can send the complaint in writing to the Superintendent of Police, who must investigate the matter.',
+          'When you arrive at the police station, bring any evidence you have — photographs, screenshots, witness contact details, or medical reports. You are entitled to a free copy of the FIR. Keep it safe, as it is the primary document for tracking your case. If you feel unsafe going alone, bring a trusted person or contact an NGO for support.',
+          'If your complaint is not registered, you have the right to approach a Magistrate under Section 156(3) CrPC, who can direct the police to register and investigate. Legal aid is available free of charge through the District Legal Services Authority (DLSA) if you cannot afford a lawyer. Remember: filing a false complaint is an offence, but genuine complaints are fully protected by law.'
+        ]
+      },
+      {
+        id: 'legal-2',
+        category: 'legal',
+        categoryLabel: 'Legal Rights',
+        icon: '🏛️',
+        title: 'Protection of Women from Domestic Violence Act',
+        description: 'Understand the key provisions of the PWDVA 2005 and how it protects women from physical, emotional, and economic abuse.',
+        content: [
+          'The Protection of Women from Domestic Violence Act, 2005 (PWDVA) provides civil remedies to women who have experienced domestic violence. The Act covers not just physical violence but also emotional, verbal, sexual, and economic abuse. It applies to women in any domestic relationship — including wives, live-in partners, mothers, sisters, and daughters.',
+          'Under the PWDVA, you can apply for a Protection Order to stop the abuser from contacting or approaching you, a Residence Order to ensure you are not evicted from your shared home, a Monetary Relief Order for financial support and compensation, and a Custody Order for your children. These orders can be obtained quickly through a Magistrate\'s court.',
+          'Protection Officers (POs) are appointed in every district to assist survivors. They help file Domestic Incident Reports (DIRs), connect you with shelter homes and legal aid, and ensure orders are enforced. You do not need a lawyer to approach a Protection Officer — their services are free and confidential.'
+        ]
+      },
+      {
+        id: 'legal-3',
+        category: 'legal',
+        categoryLabel: 'Legal Rights',
+        icon: '💼',
+        title: 'Sexual Harassment at Workplace (POSH Act)',
+        description: 'Know your rights under the POSH Act 2013 — how to file a complaint with the Internal Complaints Committee and what to expect.',
+        content: [
+          'The Sexual Harassment of Women at Workplace (Prevention, Prohibition and Redressal) Act, 2013 — commonly called the POSH Act — mandates that every organisation with 10 or more employees must have an Internal Complaints Committee (ICC). The ICC is the first point of contact for filing a workplace harassment complaint.',
+          'Sexual harassment under the POSH Act includes unwelcome physical contact, sexually coloured remarks, showing pornography, demands for sexual favours, and any other unwelcome conduct of a sexual nature. The Act covers all women employees — permanent, temporary, contractual, or on probation — as well as interns and visitors.',
+          'To file a complaint, submit a written complaint to the ICC within 3 months of the incident (extendable to 6 months). The ICC must complete its inquiry within 90 days and submit a report to the employer. If your organisation does not have an ICC, you can approach the Local Complaints Committee (LCC) set up by the District Officer. Retaliation against a complainant is strictly prohibited under the Act.'
+        ]
+      },
+      {
+        id: 'safety-1',
+        category: 'safety',
+        categoryLabel: 'Safety Tips',
+        icon: '🛡️',
+        title: 'Personal Safety: 10 Essential Tips',
+        description: 'Practical, everyday strategies to stay safe in public spaces, at home, and while commuting.',
+        content: [
+          'Personal safety starts with awareness. Always be conscious of your surroundings — avoid looking at your phone while walking in unfamiliar areas. Trust your instincts: if a situation or person makes you uncomfortable, remove yourself from it. Walk confidently and make brief eye contact with people around you, as this signals alertness.',
+          'Share your location and travel plans with a trusted friend or family member when going somewhere new. Use well-lit, populated routes whenever possible. If you feel you are being followed, walk into a busy shop, restaurant, or public building. Do not confront the person — instead, call for help or alert security. Keep your phone charged and have emergency numbers saved.',
+          'At home, ensure your doors and windows have working locks. Do not open the door to strangers without verifying their identity. In your building or neighbourhood, build a network of trusted neighbours. If you live alone, consider a door alarm or security camera. Online, be cautious about sharing your home address or daily routine on social media.'
+        ]
+      },
+      {
+        id: 'safety-2',
+        category: 'safety',
+        categoryLabel: 'Safety Tips',
+        icon: '🔒',
+        title: 'Digital Safety: Protecting Your Online Privacy',
+        description: 'Steps to protect yourself from cyberstalking, doxxing, and online harassment.',
+        content: [
+          'Your digital footprint can reveal more than you realise. Regularly review the privacy settings on all your social media accounts and limit who can see your posts, location, and personal details. Avoid posting real-time location updates or photos that reveal your home, workplace, or daily routine. Use a strong, unique password for each account and enable two-factor authentication (2FA) wherever possible.',
+          'Cyberstalking and online harassment are serious crimes. If someone is sending you threatening or harassing messages, do not delete them — take screenshots as evidence. Block the person on all platforms and report the account. If the harassment continues or escalates, file a complaint with the Cyber Crime Cell (cybercrime.gov.in in India) or your local police.',
+          'Be cautious about what you share in online groups, dating apps, or forums. Avoid sharing your phone number, home address, or workplace with people you have not met in person. Use a separate email address for online sign-ups. If you suspect your device has been compromised with spyware, contact a trusted technician and consider a factory reset. Your digital safety is as important as your physical safety.'
+        ]
+      },
+      {
+        id: 'safety-3',
+        category: 'safety',
+        categoryLabel: 'Safety Tips',
+        icon: '🚌',
+        title: 'Safe Travel Tips for Women',
+        description: 'How to stay safe while using public transport, taxis, and travelling alone.',
+        content: [
+          'When using public transport, prefer well-lit, busy stops and platforms. On buses and trains, sit near other passengers or in designated women\'s compartments where available. Keep your bag in front of you and be aware of pickpockets in crowded spaces. If someone makes you uncomfortable, move to a different seat or alert the driver or conductor.',
+          'When booking a cab or auto-rickshaw, always share the ride details — driver name, vehicle number, and estimated arrival time — with a trusted contact. Use the in-app safety features offered by ride-hailing apps, such as live location sharing and emergency SOS. Sit in the back seat and keep the window slightly open. If the driver takes an unfamiliar route, ask them to stop in a public area and exit the vehicle.',
+          'When travelling alone, research your destination in advance. Book accommodation in reputable, well-reviewed places. Keep a copy of your ID and important documents separate from the originals. Carry a portable charger for your phone. In an emergency, dial the national helpline (112 in India) or approach the nearest police station, hospital, or public building for help.'
+        ]
+      },
+      {
+        id: 'selfdefense-1',
+        category: 'selfdefense',
+        categoryLabel: 'Self-Defense Basics',
+        icon: '🥋',
+        title: 'Basic Self-Defense Moves Everyone Should Know',
+        description: 'Simple, effective techniques to break free from common grabs and create distance from an attacker.',
+        content: [
+          'Self-defense is not about fighting — it is about creating enough time and space to escape. The most important principle is to make noise: shout "Help!" or "Fire!" loudly to attract attention. Attackers rely on silence and surprise; your voice is your first weapon. If grabbed from behind, stomp hard on the attacker\'s foot, then drive your elbow back into their ribs and move away quickly.',
+          'If someone grabs your wrist, rotate your arm toward the attacker\'s thumb — the weakest point of their grip — and pull sharply. This simple motion can break most wrist grabs. If pushed against a wall, use your forearms to create space between you and the attacker, then push off and run. Aim for vulnerable areas if you must strike: the eyes, nose, throat, and groin are highly sensitive and can temporarily disable an attacker.',
+          'The palm heel strike is safer than a closed fist for untrained individuals. Drive the heel of your palm upward into the attacker\'s nose or chin. A knee strike to the groin is effective at close range. After any defensive action, do not stay to fight — run toward people, light, and safety. Consider enrolling in a basic self-defense class; even a few hours of training can significantly boost your confidence and capability.'
+        ]
+      },
+      {
+        id: 'selfdefense-2',
+        category: 'selfdefense',
+        categoryLabel: 'Self-Defense Basics',
+        icon: '👁️',
+        title: 'Situational Awareness: Your First Line of Defense',
+        description: 'How to read your environment, identify potential threats early, and make safer decisions before a situation escalates.',
+        content: [
+          'Situational awareness means knowing what is happening around you and anticipating what could happen next. Security experts use a colour-coded system: White (relaxed, unaware), Yellow (relaxed but alert), Orange (specific alert — something has caught your attention), and Red (action required). The goal is to stay in Yellow most of the time — calm but observant — so you can move to Orange or Red quickly if needed.',
+          'When you enter a new space — a restaurant, a parking lot, a train station — take a few seconds to identify the exits, note who is around you, and assess the general atmosphere. Avoid distractions like headphones or your phone in unfamiliar or potentially unsafe environments. Notice if someone is paying unusual attention to you or mirroring your movements. If something feels wrong, it probably is — act on that feeling early.',
+          'Pre-incident indicators are behaviours that often precede an attack: unusual eye contact, someone closing distance without reason, hands hidden in pockets, or someone who seems to be waiting for you. If you notice these signs, increase your distance, change your route, or enter a public space. Situational awareness is a skill that improves with practice — make it a habit to briefly scan your environment whenever you arrive somewhere new.'
+        ]
+      }
+    ];
+
+    const Awareness = {
+      _currentArticleId: null,
+
+      init() {
+        const body = document.getElementById('awareness-body');
+        if (!body) return;
+
+        const categories = [
+          { key: 'legal',       label: 'Legal Rights',       icon: '⚖️' },
+          { key: 'safety',      label: 'Safety Tips',        icon: '🛡️' },
+          { key: 'selfdefense', label: 'Self-Defense Basics', icon: '🥋' }
+        ];
+
+        body.innerHTML = categories.map(cat => {
+          const articles = AWARENESS_ARTICLES.filter(a => a.category === cat.key);
+          const badgeClass = `awareness-badge-${cat.key}`;
+          const cards = articles.map(article => `
+            <div class="awareness-article-card" role="article">
+              <div class="awareness-article-top">
+                <span class="awareness-article-icon" aria-hidden="true">${article.icon}</span>
+                <div class="awareness-article-info">
+                  <span class="awareness-badge ${badgeClass}">${cat.label}</span>
+                  <div class="awareness-article-title">${article.title}</div>
+                </div>
+              </div>
+              <p class="awareness-article-desc">${article.description}</p>
+              <button
+                class="awareness-read-btn"
+                onclick="Awareness.openArticle('${article.id}')"
+                aria-label="Read: ${article.title}"
+              >Read →</button>
+            </div>
+          `).join('');
+
+          return `
+            <div>
+              <div class="awareness-category-heading" role="heading" aria-level="2">
+                ${cat.icon} ${cat.label}
+              </div>
+              ${cards}
+            </div>
+          `;
+        }).join('');
+      },
+
+      openArticle(articleId) {
+        Awareness._currentArticleId = articleId;
+        Router.navigate('article');
+      },
+
+      renderArticle() {
+        const id = Awareness._currentArticleId;
+        const article = AWARENESS_ARTICLES.find(a => a.id === id);
+
+        const headerTitle = document.getElementById('article-header-title');
+        const body = document.getElementById('article-body');
+        if (!body) return;
+
+        if (!article) {
+          if (headerTitle) headerTitle.textContent = 'Article';
+          body.innerHTML = '<p style="padding:24px;color:#888;">Article not found.</p>';
+          return;
+        }
+
+        if (headerTitle) headerTitle.textContent = article.title;
+
+        const badgeClass = `awareness-badge-${article.category}`;
+        const paragraphs = article.content.map(p => `<p>${p}</p>`).join('');
+
+        body.innerHTML = `
+          <div class="article-hero-icon" aria-hidden="true">${article.icon}</div>
+          <span class="awareness-badge ${badgeClass}" style="align-self:flex-start;">${article.categoryLabel}</span>
+          <h1 class="article-full-title">${article.title}</h1>
+          <div class="article-divider"></div>
+          <div class="article-content-text">${paragraphs}</div>
+        `;
+      }
+    };
+
+    // ── Settings ─────────────────────────────────────────────────────────────
+
+    const Settings = {
+
+      init() {
+        const s = AppState.settings;
+
+        // Language
+        const langSel = document.getElementById('settings-language-select');
+        if (langSel) langSel.value = s.language || 'en';
+
+        // Auto-delete slider
+        const slider = document.getElementById('settings-autodelete-slider');
+        const sliderVal = document.getElementById('settings-autodelete-value');
+        const days = s.autoDeleteDays || 30;
+        if (slider) {
+          slider.value = days;
+          Settings._updateSliderFill(slider);
+        }
+        if (sliderVal) sliderVal.textContent = `${days} days`;
+
+        // Theme buttons
+        Settings._updateThemeButtons(s.theme || 'system');
+
+        // Notification toggles
+        const notif = s.notificationsEnabled || {};
+        const cEl = document.getElementById('settings-notif-complaints');
+        const sEl = document.getElementById('settings-notif-safety');
+        const aEl = document.getElementById('settings-notif-awareness');
+        if (cEl) cEl.checked = notif.complaints !== false;
+        if (sEl) sEl.checked = notif.safety !== false;
+        if (aEl) aEl.checked = notif.awareness !== false;
+
+        // Contacts
+        Settings.renderContacts();
+
+        // Hide contact form
+        const form = document.getElementById('settings-contact-form');
+        if (form) form.hidden = true;
+        const addBtn = document.getElementById('settings-add-contact-btn');
+        if (addBtn) addBtn.hidden = false;
+      },
+
+      saveLanguage(lang) {
+        AppState.settings.language = lang;
+        AppState.language = lang;
+        Store.save('sv_settings', AppState.settings);
+      },
+
+      onAutoDeleteInput(val) {
+        const slider = document.getElementById('settings-autodelete-slider');
+        const sliderVal = document.getElementById('settings-autodelete-value');
+        if (sliderVal) sliderVal.textContent = `${val} days`;
+        if (slider) Settings._updateSliderFill(slider);
+      },
+
+      _updateSliderFill(slider) {
+        const min = Number(slider.min);
+        const max = Number(slider.max);
+        const val = Number(slider.value);
+        const pct = ((val - min) / (max - min)) * 100;
+        slider.style.setProperty('--range-pct', `${pct}%`);
+      },
+
+      setTheme(theme) {
+        AppState.settings.theme = theme;
+        Theme.apply(theme);
+        Settings._updateThemeButtons(theme);
+        Store.save('sv_settings', AppState.settings);
+        // Sync dashboard icon
+        if (typeof Dashboard !== 'undefined' && Dashboard.updateThemeIcon) {
+          Dashboard.updateThemeIcon();
+        }
+      },
+
+      _updateThemeButtons(theme) {
+        ['light', 'dark', 'system'].forEach(t => {
+          const btn = document.getElementById(`settings-theme-${t}`);
+          if (!btn) return;
+          const isActive = t === theme;
+          btn.classList.toggle('active', isActive);
+          btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+        });
+      },
+
+      savePrivacy() {
+        const slider = document.getElementById('settings-autodelete-slider');
+        if (slider) {
+          AppState.settings.autoDeleteDays = Number(slider.value);
+        }
+        Store.save('sv_settings', AppState.settings);
+      },
+
+      saveNotifications() {
+        const cEl = document.getElementById('settings-notif-complaints');
+        const sEl = document.getElementById('settings-notif-safety');
+        const aEl = document.getElementById('settings-notif-awareness');
+        AppState.settings.notificationsEnabled = {
+          complaints: cEl ? cEl.checked : true,
+          safety:     sEl ? sEl.checked : true,
+          awareness:  aEl ? aEl.checked : true
+        };
+        Store.save('sv_settings', AppState.settings);
+      },
+
+      renderContacts() {
+        const list = document.getElementById('settings-contacts-list');
+        if (!list) return;
+        const contacts = AppState.emergencyContacts;
+        if (!contacts || contacts.length === 0) {
+          list.innerHTML = `<p style="font-size:14px;color:#aaa;text-align:center;padding:8px 0;margin:0;">No emergency contacts saved yet.</p>`;
+          return;
+        }
+        list.innerHTML = contacts.map(c => `
+          <div class="settings-contact-item" data-id="${c.id}">
+            <div class="settings-contact-avatar" aria-hidden="true">👤</div>
+            <div class="settings-contact-info">
+              <div class="settings-contact-name">${Settings._esc(c.name)}</div>
+              <div class="settings-contact-phone">${Settings._esc(c.phone)}</div>
+            </div>
+            <div class="settings-contact-actions">
+              <button
+                class="settings-icon-btn"
+                onclick="Settings.editContact('${c.id}')"
+                aria-label="Edit contact ${Settings._esc(c.name)}"
+                title="Edit"
+              >✏️</button>
+              <button
+                class="settings-icon-btn danger"
+                onclick="Settings.deleteContact('${c.id}')"
+                aria-label="Delete contact ${Settings._esc(c.name)}"
+                title="Delete"
+              >🗑️</button>
+            </div>
+          </div>`).join('');
+      },
+
+      addContact() {
+        const contacts = AppState.emergencyContacts;
+        if (contacts.length >= 5) {
+          Toast.show('Maximum 5 contacts allowed');
+          return;
+        }
+        // Show form in "add" mode
+        const form = document.getElementById('settings-contact-form');
+        const title = document.getElementById('settings-contact-form-title');
+        const editId = document.getElementById('settings-contact-edit-id');
+        const nameInput = document.getElementById('settings-contact-name-input');
+        const phoneInput = document.getElementById('settings-contact-phone-input');
+        const addBtn = document.getElementById('settings-add-contact-btn');
+        if (title) title.textContent = 'Add Contact';
+        if (editId) editId.value = '';
+        if (nameInput) nameInput.value = '';
+        if (phoneInput) phoneInput.value = '';
+        if (form) form.hidden = false;
+        if (addBtn) addBtn.hidden = true;
+        if (nameInput) nameInput.focus();
+      },
+
+      editContact(id) {
+        const contact = AppState.emergencyContacts.find(c => c.id === id);
+        if (!contact) return;
+        const form = document.getElementById('settings-contact-form');
+        const title = document.getElementById('settings-contact-form-title');
+        const editId = document.getElementById('settings-contact-edit-id');
+        const nameInput = document.getElementById('settings-contact-name-input');
+        const phoneInput = document.getElementById('settings-contact-phone-input');
+        const addBtn = document.getElementById('settings-add-contact-btn');
+        if (title) title.textContent = 'Edit Contact';
+        if (editId) editId.value = id;
+        if (nameInput) nameInput.value = contact.name;
+        if (phoneInput) phoneInput.value = contact.phone;
+        if (form) form.hidden = false;
+        if (addBtn) addBtn.hidden = true;
+        if (nameInput) nameInput.focus();
+      },
+
+      saveContactForm() {
+        const editId = (document.getElementById('settings-contact-edit-id') || {}).value || '';
+        const name = ((document.getElementById('settings-contact-name-input') || {}).value || '').trim();
+        const phone = ((document.getElementById('settings-contact-phone-input') || {}).value || '').trim();
+
+        if (!name || !phone) {
+          Toast.show('Please enter both name and phone number.');
+          return;
+        }
+
+        if (editId) {
+          // Edit existing
+          const idx = AppState.emergencyContacts.findIndex(c => c.id === editId);
+          if (idx !== -1) {
+            AppState.emergencyContacts[idx] = { id: editId, name, phone };
+          }
+        } else {
+          // Add new
+          if (AppState.emergencyContacts.length >= 5) {
+            Toast.show('Maximum 5 contacts allowed');
+            return;
+          }
+          const newId = 'c_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+          AppState.emergencyContacts.push({ id: newId, name, phone });
+        }
+
+        Store.save('sv_contacts', AppState.emergencyContacts);
+        Settings.cancelContactForm();
+        Settings.renderContacts();
+        Toast.show(editId ? 'Contact updated.' : 'Contact added.');
+      },
+
+      cancelContactForm() {
+        const form = document.getElementById('settings-contact-form');
+        const addBtn = document.getElementById('settings-add-contact-btn');
+        if (form) form.hidden = true;
+        if (addBtn) addBtn.hidden = false;
+      },
+
+      deleteContact(id) {
+        const contact = AppState.emergencyContacts.find(c => c.id === id);
+        const name = contact ? contact.name : 'this contact';
+        Modal.show(`Delete "${name}"?`, () => {
+          AppState.emergencyContacts = AppState.emergencyContacts.filter(c => c.id !== id);
+          Store.save('sv_contacts', AppState.emergencyContacts);
+          Settings.renderContacts();
+          Toast.show('Contact deleted.');
+        });
+      },
+
+      deleteAccount() {
+        Modal.show(
+          'Delete your account and all data? This cannot be undone.',
+          () => {
+            // Clear all known localStorage keys
+            ['sv_complaints', 'sv_contacts', 'sv_offline_reports', 'sv_settings', 'sv_onboarded', 'sv_theme'].forEach(k => {
+              localStorage.removeItem(k);
+            });
+            // Reset AppState
+            AppState.currentUser = { mode: 'anonymous' };
+            AppState.theme = 'light';
+            AppState.language = 'en';
+            AppState.emergencyContacts = [];
+            AppState.offlineReports = [];
+            AppState.complaints = [];
+            AppState.settings = {
+              theme: 'system',
+              language: 'en',
+              notificationsEnabled: { complaints: true, safety: true, awareness: true },
+              autoDeleteDays: 30,
+              emergencyHelpline: '112'
+            };
+            AppState.chat = { messages: [], botActive: true };
+            AppState.sosActive = false;
+            AppState.sosIntervalId = null;
+            Theme.apply('system');
+            Toast.show('Account deleted. All data cleared.');
+            Router.navigate('auth');
+          }
+        );
+      },
+
+      _esc(str) {
+        return String(str || '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      }
+    };
+
+    // ── App Init ─────────────────────────────────────────────────────────────
+
+    function initApp() {
+      Theme.init();
+
+      // Load persisted state
+      AppState.emergencyContacts = Store.load('sv_contacts', []);
+      AppState.complaints = Store.load('sv_complaints', []);
+      AppState.offlineReports = Store.load('sv_offline_reports', []);
+      const savedSettings = Store.load('sv_settings', null);
+      if (savedSettings) Object.assign(AppState.settings, savedSettings);
+
+      // First-launch check
+      const onboarded = Store.load('sv_onboarded', false);
+      if (!onboarded) {
+        Router.navigate('onboarding');
+      } else {
+        Router.navigate('dashboard');
+      }
+    }
+
+    // Handle browser back button
+    window.addEventListener('popstate', (e) => {
+      if (e.state && e.state.screen) {
+        const target = document.querySelector(`[data-screen="${e.state.screen}"]`);
+        if (target) {
+          document.querySelectorAll('[data-screen]').forEach(s => s.classList.remove('active'));
+          target.classList.add('active');
+        }
+      }
+    });
+
+    // ── Module Export Shim ───────────────────────────────────────────────────
+
+    if (typeof module !== 'undefined') {
+      module.exports = {
+        Router,
+        AppState,
+        Store,
+        Toast,
+        Modal,
+        Theme,
+        SOS,
+        QuickExit,
+        Auth,
+        Dashboard,
+        Report,
+        generateComplaintId,
+        Onboarding,
+        Track,
+        HelpMap,
+        Chat,
+        Awareness,
+        AWARENESS_ARTICLES,
+        Settings
+      };
+    }
+
+    // Boot
+    if (typeof document !== 'undefined' && document.readyState !== 'loading') {
+      initApp();
+    } else if (typeof document !== 'undefined') {
+      document.addEventListener('DOMContentLoaded', initApp);
+    }
+  </script>
+</body>
+</html>
